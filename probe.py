@@ -1,12 +1,13 @@
 #!/usr/bin/python
 
 import sys
+from binascii import hexlify
 
 from kafka import KafkaConsumer
 # kafka library installed via 'pip install kafka-python'
 # also requires snappy: 'pip install python-snappy'
 
-def listen(name,consumer,topics):
+def listen(name,consumer,topics,verbose=False):
     if (topics[0] in ('*','all')):
         consumer.subscribe(pattern='.*')
     else:
@@ -16,7 +17,18 @@ def listen(name,consumer,topics):
             consumer.subscribe(pattern=topics[0])
     print('listening to',name, 'for topics',topics)
     for message in consumer:
-        print ("%s:%d:%d: key=%s length=%d" % (message.topic, message.partition, message.offset, message.key, len(message.value)))
+        if verbose:
+            try:
+                print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, message.value))
+            except UnicodeDecodeError as e:
+                print(e)
+                try:
+                    print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, message.value.decode('utf-8')))
+                except UnicodeDecodeError as e:
+                    print(e)
+                    print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, hexlify(message.value)))
+        else:
+            print ("%s:%d:%d: key=%s length=%d" % (message.topic, message.partition, message.offset, message.key, len(message.value)))
 
 
 collectors =  [ ('caida openBMP',lambda: KafkaConsumer(bootstrap_servers=['bmp.bgpstream.caida.org:9092'],client_id='lancaster_university_UK',group_id='beta-bmp-stream')),
@@ -45,5 +57,9 @@ elif (1 < argc):
     probe(name,consumer)
 
 if (2 < argc):
-    topics = sys.argv[2:]
-    listen(name,consumer,topics)
+    if (sys.argv[-1] in ['-v','-V']):
+        topics = sys.argv[2:-1]
+        listen(name,consumer,topics,verbose=True)
+    else:
+        topics = sys.argv[2:]
+        listen(name,consumer,topics)
