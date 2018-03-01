@@ -4,6 +4,7 @@ import sys
 import pprint
 import struct
 import string
+import ipaddress
 from binascii import hexlify
 
 from kafka import KafkaConsumer
@@ -16,8 +17,57 @@ def parse(msg):
     print ("kafka header: %s:%d:%d: key=%s" % (msg.topic, msg.partition, msg.offset, msg.key))
     if (0x4F424D50 == struct.unpack_from('!I', msg.value, offset=0)[0]):
         # this is the obmp version 1.7+ binary format
-        print ("obmp binary format message header | %s:%d:%d: key=%s value=%s" % (msg.topic, msg.partition, msg.offset, msg.key, msg.value))
-        pass
+        print ("obmp binary format message header | %s:%d:%d: key=%s" % (msg.topic, msg.partition, msg.offset, msg.key))
+        majorVersion  = struct.unpack_from('!B', msg.value, offset=4)[0]
+        assert(1 == majorVersion)
+        minorVersion  = struct.unpack_from('!B', msg.value, offset=5)[0]
+        assert(7 == minorVersion)
+        headerLength  = struct.unpack_from('!H', msg.value, offset=6)[0]
+        messageLength = struct.unpack_from('!I', msg.value, offset=8)[0]
+        assert(len(msg.value) == headerLength + messageLength)
+        flags         = struct.unpack_from('!B', msg.value, offset=12)[0]
+        isIPv6 = bool(0x40 & flags)
+        assert(not isIPv6)
+        isRouter = bool(0x80 & flags)
+        assert(isRouter)
+        objectType    = struct.unpack_from('!B', msg.value, offset=13)[0]
+        collectionTimestampSeconds = struct.unpack_from('!I', msg.value, offset=14)[0]
+        collectionTimestampMicroSeconds = struct.unpack_from('!I', msg.value, offset=18)[0]
+        collectionTimestamp= collectionTimestampSeconds + collectionTimestampMicroSeconds / 1000000.0
+        collectorHash  = msg.value[22:37]
+        collectorAdminIDLength  = struct.unpack_from('!H', msg.value, offset=38)[0]
+        if (collectorAdminIDLength):
+            collectorAdminID  = msg.value[40:40+collectorAdminIDLength]
+        else:
+            collectorAdminID = "<NULL>"
+        routerHashOffset = 40+collectorAdminIDLength
+        routerHash = msg.value[routerHashOffset:routerHashOffset+15]
+        routerIPOffset = routerHashOffset+16
+        routerIPv4num = struct.unpack_from('!I', msg.value, offset=routerIPOffset)[0]
+        routerIPv4 = ipaddress.ip_address(routerIPv4num)
+        routerGroupOffset = routerHashOffset+32
+        routerGroupLength  = struct.unpack_from('!H', msg.value, offset=routerGroupOffset)[0]
+        if (routerGroupLength):
+            routerGroup  = msg.value[routerGroupOffset+2:routerGroupOffset+routerGroupLength+2]
+        else:
+            routerGroup = "<NULL>"
+        rowCountOffset = routerGroupOffset+2+routerGroupLength
+        rowCount = struct.unpack_from('!I', msg.value, offset=rowCountOffset)[0]
+        assert(1==rowCount)
+        assert(4 == headerLength-rowCountOffset)
+
+        ## diagnostics prints only
+
+        ##payload = msg.value[headerLength:]
+        ##header = msg.value[:headerLength-1]
+        ## print ("obmp binary header content | %d:%s" % (len(header),hexlify(header)))
+        ## print ("obmp binary header values | majorVersion:%d minorVersion:%d headerLength:%d messageLength:%d flags:%x" % (majorVersion,minorVersion,headerLength,messageLength,flags))
+        ## print ("obmp binary header values | objectType:%d collectionTimestampSeconds:%d collectionTimestampMicroSeconds:%d collectorHash:%s" % (objectType,collectionTimestampSeconds,collectionTimestampMicroSeconds,hexlify(collectorHash)))
+        ## print ("obmp binary header values | collectorAdminID:%s routerHash:%s routerIPv4:%s routerGroup:%s" % (collectorAdminID,hexlify(routerHash),routerIPv4,routerGroup))
+        ## print ("obmp binary header payload | %s" % hexlify(payload))
+
+        print ("obmp header values | objectType:%d collectionTimestamp:%f collectorAdminID:%s routerIPv4:%s routerGroup:%s payload length:%d" % (objectType,collectionTimestampSeconds,collectorAdminID,routerIPv4,routerGroup,messageLength))
+
     elif (0x563A == struct.unpack_from('!H', msg.value, offset=0)[0]):
         # this is a obmp legacy text header
         headerLength = string.find(msg.value,'\n\n')
@@ -33,10 +83,9 @@ def parse(msg):
     else:
         # unrecognised format!
         h = struct.unpack_from('!H', msg.value, offset=0)[0]
-        # print(h, type(h))
         print ("unrecognised obmp message header | %s (%s)" % (hex(h), hexlify(msg.value)))
 
-def listen(name,consumer,topics,verbose=False):
+def listen(name,consumer,topics):
     if (topics[0] in ('*','all')):
         consumer.subscribe(pattern='.*')
     else:
@@ -46,22 +95,7 @@ def listen(name,consumer,topics,verbose=False):
             consumer.subscribe(pattern=topics[0])
     print('listening to',name, 'for topics',topics)
     for message in consumer:
-        ##print('type of message.value is',type(message.value))
-        ##pprint.pprint(message)
         parse(message)
-        exit()
-        if verbose:
-            try:
-                print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, message.value))
-            except UnicodeDecodeError as e:
-                print(e)
-                try:
-                    print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, message.value.decode('utf-8')))
-                except UnicodeDecodeError as e:
-                    print(e)
-                    print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, hexlify(message.value)))
-        else:
-            print ("%s:%d:%d: key=%s length=%d" % (message.topic, message.partition, message.offset, message.key, len(message.value)))
 
 
 collectors =  [
@@ -93,9 +127,5 @@ elif (1 < argc):
     probe(name,consumer)
 
 if (2 < argc):
-    if (sys.argv[-1] in ['-v','-V']):
-        topics = sys.argv[2:-1]
-        listen(name,consumer,topics,verbose=True)
-    else:
-        topics = sys.argv[2:]
-        listen(name,consumer,topics)
+    topics = sys.argv[2:]
+    listen(name,consumer,topics)
