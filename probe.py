@@ -31,9 +31,12 @@ def listen(name,consumer,topics,verbose=False):
             print ("%s:%d:%d: key=%s length=%d" % (message.topic, message.partition, message.offset, message.key, len(message.value)))
 
 
-collectors =  [ ('caida openBMP',lambda: KafkaConsumer(bootstrap_servers=['bmp.bgpstream.caida.org:9092'],client_id='lancaster_university_UK',group_id='beta-bmp-stream')),
+collectors =  [
+                ('caida openBMP',lambda: KafkaConsumer(bootstrap_servers=['bmp.bgpstream.caida.org:9092'],client_id='lancaster_university_UK',group_id='beta-bmp-stream')),
                  # refer to https://bgpstream.caida.org/v2-beta#bmp for the link and description of this service
-                ('local openBMP',lambda: KafkaConsumer(bootstrap_servers=['r720:9092']))
+                ('local openBMP',lambda: KafkaConsumer(bootstrap_servers=['r720:9092'])),
+                ('caida openBMP plain',lambda: KafkaConsumer(bootstrap_servers=['bmp.bgpstream.caida.org:9092'],client_id='lancaster_university_UK')),
+                ('bmp-dev.openbmp.org',lambda: KafkaConsumer(bootstrap_servers=['bmp-dev.openbmp.org:9092'],client_id='lancaster_university_UK',group_id='openbmp-file-consumer'))
               ]
 
 def probe(name,consumer):
