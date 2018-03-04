@@ -15,11 +15,13 @@ from kafka import KafkaConsumer
 #refer to ./docs/MESSAGE_BUS_API.md in branch 'caida' of https://github.com/CAIDA/openbmp.git
 
 def parse(msg):
-    payload = null
-    print ("kafka header: %s:%d:%d: key=%s" % (msg.topic, msg.partition, msg.offset, msg.key))
+    payload = None
+    # print ("kafka header: %s:%d:%d: key=%s" % (msg.topic, msg.partition, msg.offset, msg.key))
     if (0x4F424D50 == struct.unpack_from('!I', msg.value, offset=0)[0]):
         # this is the obmp version 1.7+ binary format
-        print ("obmp binary format message header | %s:%d:%d: key=%s" % (msg.topic, msg.partition, msg.offset, msg.key))
+        ## print ("obmp binary format message header")
+        sys.stdout.write('.')
+        sys.stdout.flush()
         majorVersion  = struct.unpack_from('!B', msg.value, offset=4)[0]
         assert(1 == majorVersion)
         minorVersion  = struct.unpack_from('!B', msg.value, offset=5)[0]
@@ -68,7 +70,7 @@ def parse(msg):
         ## print ("obmp binary header values | collectorAdminID:%s routerHash:%s routerIPv4:%s routerGroup:%s" % (collectorAdminID,hexlify(routerHash),routerIPv4,routerGroup))
         ## print ("obmp binary header payload | %s" % hexlify(payload))
 
-        print ("obmp header values | objectType:%d collectionTimestamp:%f collectorAdminID:%s routerIPv4:%s routerGroup:%s payload length:%d" % (objectType,collectionTimestampSeconds,collectorAdminID,routerIPv4,routerGroup,messageLength))
+        ## print ("obmp header values | objectType:%d collectionTimestamp:%f collectorAdminID:%s routerIPv4:%s routerGroup:%s payload length:%d" % (objectType,collectionTimestampSeconds,collectorAdminID,routerIPv4,routerGroup,messageLength))
 
     elif (0x563A == struct.unpack_from('!H', msg.value, offset=0)[0]):
         # this is a obmp legacy text header
@@ -77,11 +79,15 @@ def parse(msg):
         payloadLength = msgLength-headerLength-2
         header = msg.value[:headerLength]
         payload = msg.value[headerLength+2:]
-        print ("obmp legacy text message header  | %s" % header)
-        print ("obmp legacy text message payload | %d:%s" % (payloadLength,hexlify(payload)))
+        ## print ("obmp legacy text message header  | %s" % header)
+        ## print ("obmp legacy text message payload | %d:%s" % (payloadLength,hexlify(payload)))
+        sys.stdout.write('-')
+        sys.stdout.flush()
     elif (0x5645 == struct.unpack_from('!H', msg.value, offset=0)[0]):
         # this is a obmp (new format) text header
-        print ("obmp (new format) text message header | %s" % msg.value)
+        ## print ("obmp (new format) text message header | %s" % msg.value)
+        sys.stdout.write('+')
+        sys.stdout.flush()
     else:
         # unrecognised format!
         h = struct.unpack_from('!H', msg.value, offset=0)[0]
@@ -103,8 +109,8 @@ def send(sock,msg):
     try:
         sock.sendall(msg)
 
-    except socket.error as msg:
-        print("Failed to send message to collector: %r", msg)
+    except socket.error as errmsg:
+        print("Failed to send message to collector: %r", errmsg)
         exit()
 
 def forward(name,consumer,topics):
@@ -117,7 +123,16 @@ def forward(name,consumer,topics):
         except ValueError:
             consumer.subscribe(pattern=topics[0])
     print('listening to',name, 'for topics',topics)
+    topicsReceved = {}
     for message in consumer:
+        topic = message.topic
+        if (topic in topicsReceved):
+            pass
+            ##sys.stdout.write('.')
+            ##sys.stdout.flush()
+        else:
+            print("first messagereceived for topic %s" % topic)
+            topicsReceved[topic] = None
         msg = parse(message)
         if (msg):
             send(sock,msg)
