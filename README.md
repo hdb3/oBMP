@@ -13,5 +13,5 @@ parse.py does not process content at BMP protocol level
 forward.py extends parse.py  
   Forward.py is a connector between openBMP Kafka messaging context and basic BMP.  
   It unpacks the BMP payload from the Kafka envelope and forwards the BMP message on a TCP connection  
-  A vanilla BMP collector can use this directly, however it suffers the limitation that unlie a true BMP session ther eis no initial FIB dump, or exchange of other BMP messages on session establishment.
+  A vanilla BMP collector can use this directly, however it suffers the limitation that unlike a true BMP session there is no initial FIB dump, or exchange of other BMP messages on session establishment.
 
