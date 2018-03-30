@@ -1,7 +1,7 @@
 forward:
     target:
             host: localhost
-            port: 5000
+            port: 5001
 
     collector:
             bootstrap_servers: bmp.bgpstream.caida.org:9092

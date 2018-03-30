@@ -21,6 +21,7 @@ def parse(msg):
     if (0x4F424D50 == struct.unpack_from('!I', msg.value, offset=0)[0]):
         # this is the obmp version 1.7+ binary format
         ## print ("obmp binary format message header")
+        majorVersion  = struct.unpack_from('!B', msg.value, offset=4)[0]
         assert(1 == majorVersion)
         minorVersion  = struct.unpack_from('!B', msg.value, offset=5)[0]
         assert(7 == minorVersion)
@@ -124,7 +125,6 @@ def forward(collector,target):
             print("first message received")
         sys.stdout.write('.')
         sys.stdout.flush()
-        majorVersion  = struct.unpack_from('!B', msg.value, offset=4)[0]
         messages_received += 1
         msg = parse(message)
         if (msg):
