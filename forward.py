@@ -1,5 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
+import yaml
 import sys
 import pprint
 import struct
@@ -20,9 +21,6 @@ def parse(msg):
     if (0x4F424D50 == struct.unpack_from('!I', msg.value, offset=0)[0]):
         # this is the obmp version 1.7+ binary format
         ## print ("obmp binary format message header")
-        sys.stdout.write('.')
-        sys.stdout.flush()
-        majorVersion  = struct.unpack_from('!B', msg.value, offset=4)[0]
         assert(1 == majorVersion)
         minorVersion  = struct.unpack_from('!B', msg.value, offset=5)[0]
         assert(7 == minorVersion)
@@ -95,13 +93,13 @@ def parse(msg):
 
     return(payload)
 
-def connect():
+def connect(host,port):
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('localhost',5000))
+        sock.connect((host,port))
     except socket.error as msg:
-        print("Failed to connect to remote collector: %r", msg)
+        print("Failed to connect to remote target",host,port, msg)
         exit()
     return(sock)
 
@@ -110,61 +108,37 @@ def send(sock,msg):
         sock.sendall(msg)
 
     except socket.error as errmsg:
-        print("Failed to send message to collector: %r", errmsg)
+        print("Failed to send message to target", errmsg)
         exit()
 
-def forward(name,consumer,topics):
-    sock = connect()
-    if (topics[0] in ('*','all')):
-        consumer.subscribe(pattern='.*')
-    else:
-        try:
-            consumer.subscribe(topics=topics)
-        except ValueError:
-            consumer.subscribe(pattern=topics[0])
-    print('listening to',name, 'for topics',topics)
-    topicsReceved = {}
+def forward(collector,target):
+    sock = connect(target['host'],target['port'])
+
+    consumer = KafkaConsumer(bootstrap_servers=collector['bootstrap_servers'],client_id=collector['client_id'],group_id=collector['group_id'])
+    consumer.subscribe(topics=collector['topic'])
+    print('listening to',collector['bootstrap_servers'], 'for topics',collector['topic'])
+    messages_received = 0
     for message in consumer:
-        topic = message.topic
-        if (topic in topicsReceved):
-            pass
-            ##sys.stdout.write('.')
-            ##sys.stdout.flush()
-        else:
-            print("first messagereceived for topic %s" % topic)
-            topicsReceved[topic] = None
+        assert message.topic == collector['topic']
+        if not messages_received:
+            print("first message received")
+        sys.stdout.write('.')
+        sys.stdout.flush()
+        majorVersion  = struct.unpack_from('!B', msg.value, offset=4)[0]
+        messages_received += 1
         msg = parse(message)
         if (msg):
             send(sock,msg)
 
-collectors =  [
-                ('caida openBMP',lambda: KafkaConsumer(bootstrap_servers=['bmp.bgpstream.caida.org:9092'],client_id='lancaster_university_UK',group_id='beta-bmp-stream')),
-                 # refer to https://bgpstream.caida.org/v2-beta#bmp for the link and description of this service
-                ('local openBMP',lambda: KafkaConsumer(bootstrap_servers=['r720:9092'])),
-                ('caida openBMP plain',lambda: KafkaConsumer(bootstrap_servers=['bmp.bgpstream.caida.org:9092'],client_id='lancaster_university_UK')),
-                ('bmp-dev.openbmp.org',lambda: KafkaConsumer(bootstrap_servers=['bmp-dev.openbmp.org:9092'],client_id='lancaster_university_UK',group_id='openbmp-file-consumer'))
-              ]
+with open("config.yml", 'r') as ymlfile:
+    cfg = yaml.load(ymlfile)
+    if ('forward' not in cfg):
+        sys.exit("could not find section 'forward' in config file")
+    else:
+        forward_cfg=cfg['forward']
+    if ('collector' not in forward_cfg):
+        sys.exit("could not find sub-section 'collector' in config file")
+    if ('target' not in forward_cfg):
+        sys.exit("could not find sub-section 'target' in config file")
 
-def probe(name,consumer):
-    print('probing',name, 'for topics')
-    for topic in consumer.topics():
-        print(topic)
-
-argc = len(sys.argv)
-
-if (1 == argc):
-   n=1
-   print('target collectors are:')
-   for collector in collectors:
-      print('%d : %s' % (n,collector[0]))
-      n+=1
-elif (1 < argc):
-    n = int(sys.argv[1])-1
-    collector = collectors[n]
-    name     = collector[0]
-    consumer = collector[1]()
-    probe(name,consumer)
-
-if (2 < argc):
-    topics = sys.argv[2:]
-    forward(name,consumer,topics)
+    forward(forward_cfg['collector'],forward_cfg['target'])
