@@ -1,0 +1,13 @@
+forward:
+    target:
+            host: localhost
+            port: 5000
+
+    collector:
+            bootstrap_servers: bmp.bgpstream.caida.org:9092
+            client_id: lancaster_university_UK
+            group_id: beta-bmp-stream
+            topic: openbmp.router--route-views.routeviews.org.peer-as--3356.bmp_raw
+#           topic: openbmp.router--cisco-research.peer-as--11017.bmp_raw
+#           topic: openbmp.router--route-views.routeviews.org.peer-as--6939.bmp_raw
+#           topic: openbmp.router--route-views.routeviews.org.peer-as--7018.bmp_raw
