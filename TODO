@@ -1,0 +1,5 @@
+
+## TODO - forward.py
+
+Allow connection to upstream and downstream to be separate threads.
+So that each side can wait and reconnect when remote side is available.
