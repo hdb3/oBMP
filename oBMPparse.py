@@ -9,7 +9,7 @@ import sys
 #import pprint
 import struct
 #import string
-#import ipaddress
+import ipaddress
 from binascii import hexlify
 from eprint import eprint
 
