@@ -79,8 +79,8 @@ def get_BMP_messages(msg):
     BMP_last_message = msg
 
     msg_len  = len(msg)
-    if msg_len > self.max_rcvd_message_length:
-        self.max_rcvd_message_length = msg_len
+    if msg_len > max_rcvd_message_length:
+        max_rcvd_message_length = msg_len
         eprint("-- max BMP message size %d" %  msg_len)
 
     offset = 0
