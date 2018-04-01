@@ -13,6 +13,8 @@ import threading
 from time import sleep
 
 from oBMPparse import oBMP_parse
+from bgpparse import *
+from bmpparse import *
 
 # kafka library and snappy installed via 'pip install kafka-python python-snappy'
 # snappy also requires dev headers - apt install libsnappy-dev
@@ -105,9 +107,20 @@ def forward(collector,target):
         if not messages_received:
             sys.stderr.write("first message received\n")
         messages_received += 1
-        msg = oBMP_parse(message.value)
-        if (msg):
-            forwarder.send(msg)
+        raw_msg = oBMP_parse(message.value)
+        ##################################
+
+        bmpmsgs = get_BMP_messages(raw_msg)
+        for bmpmsg in bmpmsgs:
+            if bmpmsg.msg_type == BMP_Statistics_Report:
+                eprint("-- BMP stats report rcvd, length %d" % bmpmsg.length)
+            elif bmpmsg.msg_type == BMP_Route_Monitoring:
+                bgpmsg = bmpmsg.bmp_RM_bgp_message
+                forwarder.send(bgpmsg)
+                parsed_bgp_message = BGP_message(bgpmsg)
+            else:
+                sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
+        ##################################
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
