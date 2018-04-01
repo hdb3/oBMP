@@ -8,12 +8,9 @@
 
 import yaml
 import sys
-import pprint
-import struct
-import string
-import ipaddress
-from binascii import hexlify
 import socket
+import threading
+from time import sleep
 
 from oBMPparse import oBMP_parse
 
@@ -21,41 +18,94 @@ from oBMPparse import oBMP_parse
 
 from kafka import KafkaConsumer
 
-def connect(host,port):
 
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host,port))
-    except socket.error as msg:
-        print("Failed to connect to remote target",host,port, msg)
-        exit()
-    return(sock)
+Initialising = 1
+Connecting = 2
+Connected = 3
+Error = 4
+Retrying = 5
+Connected = 6
+Disconnected = 7
 
-def send(sock,msg):
-    try:
-        sock.sendall(msg)
+class Forwarder(threading.Thread):
 
-    except socket.error as errmsg:
-        print("Failed to send message to target", errmsg)
-        exit()
+    def __init__(self,host,port):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.state = Initialising
+        self.connections = 0
+        self.event = threading.Event()
+        self.address = (host,port)
+
+    def run(self):
+        while True:
+            self.state = Connecting
+            if self.connections == 0:
+                sys.stderr.write("attempting connection to %s:%d\n" % self.address)
+            else:
+                sys.stderr.write("reattempting connection to %s:%d\n" % self.address)
+            while self.state != Connected:
+                try:
+                    self.sock = socket.create_connection(self.address,1)
+                except (socket.herror,socket.gaierror) as e:
+                    sys.stderr.write("unrecoverable error %s" % e + " connecting to %s:%d\n" % self.address)
+                    self.state = Error
+                    sys.exit()
+                except (socket.error,socket.timeout) as e:
+                    self.last_socket_error = e
+                    self.state = Retrying
+                    sleep(1)
+                    continue
+                except Exception as e:
+                    sys.stderr.write("unknown error %s" % e + " connecting to %s:%d\n" % self.address)
+                    self.state = Error
+                    sys.exit()
+
+                self.state = Connected
+                self.connections += 1
+                sys.stderr.write("connected to %s:%d\n" % self.address)
+                self.event.clear()
+                self.event.wait()
+                self.event.clear()
+
+    def send(self,msg):
+        if self.state != Connected:
+            sys.stderr.write('-')
+            sys.stderr.flush()
+        else:
+            try:
+                self.sock.sendall(msg)
+
+            except socket.error as errmsg:
+                if self.is_alive():
+                    self.state = Disconnected
+                    sys.stderr.write('!')
+                    sys.stderr.flush()
+                    self.event.set()
+                    return
+                else:
+                    sys.stderr.write("socket manager has exited\n")
+                    self.state = Error
+                    sys.exit()
+            sys.stderr.write('+')
+            sys.stderr.flush()
 
 def forward(collector,target):
-    sock = connect(target['host'],target['port'])
+    forwarder = Forwarder(target['host'],target['port'])
+    forwarder.start()
 
     consumer = KafkaConsumer(bootstrap_servers=collector['bootstrap_servers'],client_id=collector['client_id'],group_id=collector['group_id'])
     consumer.subscribe(topics=collector['topic'])
-    print('listening to',collector['bootstrap_servers'], 'for topics',collector['topic'])
+    sys.stderr.write("listening to %s for topics %s\n" % (collector['bootstrap_servers'], collector['topic']))
     messages_received = 0
     for message in consumer:
         assert message.topic == collector['topic']
         if not messages_received:
-            print("first message received")
-        sys.stdout.write('.')
-        sys.stdout.flush()
+            sys.stderr.write("first message received\n")
         messages_received += 1
         msg = oBMP_parse(message.value)
         if (msg):
-            send(sock,msg)
+            forwarder.send(msg)
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)

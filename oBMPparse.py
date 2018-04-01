@@ -6,12 +6,11 @@
 # the metadata provided by this encapsulaion is fortunately light, so removing it has very little impact
 
 import sys
-#import pprint
 import struct
-#import string
 import ipaddress
 from binascii import hexlify
-from eprint import eprint
+def eprint(s):
+    sys.stderr.write(s+'\n')
 
 #refer to ./docs/MESSAGE_BUS_API.md in branch 'caida' of https://github.com/CAIDA/openbmp.git
 
