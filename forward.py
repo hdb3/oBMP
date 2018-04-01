@@ -94,6 +94,10 @@ class Forwarder(threading.Thread):
             sys.stderr.write('+')
             sys.stderr.flush()
 
+def local_BGP_processor(bgpmsg):
+    parsed_bgp_message = BGP_message(bgpmsg)
+
+
 def forward(collector,target):
     forwarder = Forwarder(target['host'],target['port'])
     forwarder.start()
@@ -108,7 +112,6 @@ def forward(collector,target):
             sys.stderr.write("first message received\n")
         messages_received += 1
         raw_msg = oBMP_parse(message.value)
-        ##################################
 
         bmpmsgs = get_BMP_messages(raw_msg)
         for bmpmsg in bmpmsgs:
@@ -117,10 +120,9 @@ def forward(collector,target):
             elif bmpmsg.msg_type == BMP_Route_Monitoring:
                 bgpmsg = bmpmsg.bmp_RM_bgp_message
                 forwarder.send(bgpmsg)
-                parsed_bgp_message = BGP_message(bgpmsg)
+                local_BGP_processor(bgpmsg)
             else:
                 sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
-        ##################################
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
