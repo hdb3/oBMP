@@ -15,6 +15,8 @@ from time import sleep
 from oBMPparse import oBMP_parse
 
 # kafka library and snappy installed via 'pip install kafka-python python-snappy'
+# snappy also requires dev headers - apt install libsnappy-dev
+# For mixed python2/python3 systems use pip3 not pip, from package python3-pip
 
 from kafka import KafkaConsumer
 
