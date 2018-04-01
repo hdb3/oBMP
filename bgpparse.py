@@ -123,7 +123,7 @@ class BGP_message:
 
             prefixes += [(prefix_length,prefix)]
             ## eprint( "++ " + hexlify(prefix_list[offset:offset+ 1 + prefix_byte_length]))
-            eprint( "++ %s/%d" % (ip_address(prefix),prefix_length))
+            ## eprint( "++ %s/%d" % (ip_address(prefix),prefix_length))
             offset += 1 + prefix_byte_length
 
         return prefixes

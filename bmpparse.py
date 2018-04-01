@@ -7,7 +7,6 @@ import struct
 import sys
 import os
 import time
-#from bgpparse import *
 def eprint(s):
     sys.stderr.write(s+'\n')
     sys.stderr.flush()
@@ -35,7 +34,6 @@ class BMP_message:
 
         if 6 < self.msg_type:
             eprint("msg_type out of range %d" % self.msg_type)
-            ## sys.exit()
             return None
 
         if (self.msg_type == BMP_Initiation_Message or self.msg_type == BMP_Termination_Message):
@@ -73,13 +71,18 @@ def BMP_dump(previous_message,msg):
 
 BMP_last_message = None
 
+max_rcvd_message_length = 0
 def get_BMP_messages(msg):
 
-    global BMP_last_message
+    global BMP_last_message,max_rcvd_message_length
     previous_message = BMP_last_message
     BMP_last_message = msg
 
     msg_len  = len(msg)
+    if msg_len > self.max_rcvd_message_length:
+        self.max_rcvd_message_length = msg_len
+        eprint("-- max BMP message size %d" %  msg_len)
+
     offset = 0
     msgs = []
     while offset < msg_len:
