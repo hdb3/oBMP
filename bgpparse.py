@@ -32,6 +32,7 @@ BGP_TYPE_CODE_MP_REACH_NLRI = 14
 BGP_TYPE_CODE_MP_UNREACH_NLRI = 15
 BGP_TYPE_CODE_AS4_PATH = 17
 BGP_TYPE_CODE_AS4_AGGREGATOR = 18
+BGP_TYPE_CODE_LARGE_COMMUNITY = 32
 BGP_Attribute_Flags_Optional = 0x80 # 1 << 7
 BGP_Attribute_Flags_Transitive = 0x40 # 1 << 6
 BGP_Attribute_Flags_Partial = 0x20 # 1 << 5
@@ -42,6 +43,7 @@ class BGP_message:
 
     def __init__(self,msg):
         self.except_flag = False
+        self.unhandled_codes = []
         self.attribute = {}
         msg_len  = len(msg)
         assert msg_len > 18, "BGP message too short %d" % msg_len
@@ -98,12 +100,6 @@ class BGP_message:
     # however this library should provide the mechanism in either case.
     # For now, it is done early, whilst parsing....
 
-    # implementation note:
-    # avoiding the obvious recursive solution given that these lists can be quite long
-    # and testing python implementation of optimising tail recursion is not in scope....
-        ## eprint("get_prefixes")
-        ## eprint( hexlify(prefix_list))
-        ## eprint("")
         prefix_list_length = len(prefix_list)
         offset = 0
         prefixes = []
@@ -119,7 +115,6 @@ class BGP_message:
                 prefix_byte_length = 1
             else:
                 prefix_byte_length = 0
-            ## eprint( "++ %d:%d:%d" % (offset,prefix_list_length,prefix_byte_length))
             assert prefix_byte_length + offset < prefix_list_length
 
             prefix = 0
@@ -133,8 +128,6 @@ class BGP_message:
                 prefix |= struct.unpack_from('!B', prefix_list, offset=offset+4)[0]
 
             prefixes.append((prefix_length,prefix))
-            ## eprint( "++ " + hexlify(prefix_list[offset:offset+ 1 + prefix_byte_length]))
-            ## eprint( "++ %s/%d" % (ip_address(prefix),prefix_length))
             offset += 1 + prefix_byte_length
 
         return prefixes
@@ -160,10 +153,7 @@ class BGP_message:
             attribute = attributes[offset+quantum:offset+length+quantum]
 
             attr_count += 1
-            ## self.parse_attribute(attr_flags,attr_type_code,attribute)
             try:
-                ##eprint("++parsing attribute %d at offset %d/length %d, flags:code = (%x,%d)" % (attr_count,offset,length,attr_flags,attr_type_code))
-                ##eprint("++parsing attribute : %d %s" % (attributes_len,hexlify(attributes)))
                 self.parse_attribute(attr_flags,attr_type_code,attribute)
             except AssertionError as e:
                 self.except_flag = True
@@ -172,8 +162,6 @@ class BGP_message:
                 eprint("++failed to parse attribute : error: %s" % e)
                 eprint("++failed to parse attribute : %d %s" % (attributes_len,hexlify(attributes)))
             offset += length+quantum
-            # TODO - check that all of the mandatory attributes are present
-
 
     def parse_attribute_communities(self,attr,code):
 
@@ -182,8 +170,20 @@ class BGP_message:
         community_list = []
         offset = 0
         while offset < len(attr):
-            community_list.append(struct.unpack_from('!I', attr, offset=offset)[0])
+            community_list.append(struct.unpack_from('!HH', attr, offset=offset)[0])
             offset += 4
+
+        self.attribute[code] = community_list
+
+    def parse_attribute_large_community(self,attr,code):
+
+        assert 0 == len(attr) % 12, "BGP large community string length not multiple of 12 (%d)" % len(attr)
+
+        community_list = []
+        offset = 0
+        while offset < len(attr):
+            community_list.append(struct.unpack_from('!III', attr, offset=offset)[0])
+            offset += 12
 
         self.attribute[code] = community_list
 
@@ -213,7 +213,7 @@ class BGP_message:
         attribute_offset = 0
         attribute_length = len(attr)
         while attribute_offset < attribute_length:
-            assert attribute_length - attribute_offset > 4, \
+            assert attribute_length - attribute_offset >= 4, \
                     "minimum segment length check length %d offset %d" % (attribute_length,attribute_offset) 
 
             path_segment_type = struct.unpack_from('!B', attr, offset=attribute_offset)[0]
@@ -261,10 +261,7 @@ class BGP_message:
 
     def parse_attribute_unhandled(self,code,attr):
             self.attribute[code] = attr
-            if not self.unhandled_codes:
-                self.unhandled_codes = [code]
-            else:
-                self.unhandled_codes.append(code)
+            self.unhandled_codes.append(code)
 
     def parse_attribute(self,flags,code,attr):
 
@@ -300,6 +297,9 @@ class BGP_message:
 
         elif (code==BGP_TYPE_CODE_MP_REACH_NLRI or code == BGP_TYPE_CODE_MP_UNREACH_NLRI):
             self.parse_attribute_unhandled(code,attr)
+
+        elif (code==BGP_TYPE_CODE_LARGE_COMMUNITY):
+            self.parse_attribute_large_community(attr,code)
 
         else:
             assert False , "Unknown BGP path attribuite type %d" % code
