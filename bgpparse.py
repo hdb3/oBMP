@@ -17,6 +17,9 @@ BGP_UPDATE = 2
 BGP_NOTIFICATION = 3
 BGP_KEEPALIVE = 4
 
+# for unknown attributes use https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml
+# or dump into wireshark!
+
 BGP_TYPE_CODE_ORIGIN = 1
 BGP_TYPE_CODE_AS_PATH = 2
 BGP_TYPE_CODE_NEXT_HOP = 3
