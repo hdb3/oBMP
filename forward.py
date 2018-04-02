@@ -11,9 +11,11 @@ import sys
 import socket
 import threading
 from time import sleep
+import pprint
 
 from oBMPparse import oBMP_parse
 from bgpparse import *
+from bgprib import *
 from bmpparse import *
 
 # kafka library and snappy installed via 'pip install kafka-python python-snappy'
@@ -94,13 +96,28 @@ class Forwarder(threading.Thread):
             sys.stderr.write('+')
             sys.stderr.flush()
 
-def local_BGP_processor(bgpmsg):
+max_ribsize = 0
+
+def local_BGP_processor(rib,bgpmsg):
+    global max_ribsize
     parsed_bgp_message = BGP_message(bgpmsg)
+    for withdrawn_prefix in parsed_bgp_message.withdrawn_prefixes:
+        rib.withdraw(withdrawn_prefix)
+    ##eprint("parsed_bgp_message %s\n" % parsed_bgp_message)
+    ##eprint("parsed_bgp_message.attribute %s\n" % pprint.pformat(parsed_bgp_message.attribute))
+    for updated_prefixes in parsed_bgp_message.prefixes:
+        rib.update(updated_prefixes,parsed_bgp_message.attribute)
+    ribsize = len(rib.get_rib())
+    if ribsize > max_ribsize:
+        max_ribsize = ribsize
+        sys.stderr.write("RIB size %d\n" % max_ribsize)
+        sys.stderr.flush()
 
 
 def forward(collector,target):
     forwarder = Forwarder(target['host'],target['port'])
     forwarder.start()
+    rib = BGPrib()
 
     consumer = KafkaConsumer(bootstrap_servers=collector['bootstrap_servers'],client_id=collector['client_id'],group_id=collector['group_id'])
     consumer.subscribe(topics=collector['topic'])
@@ -120,7 +137,7 @@ def forward(collector,target):
             elif bmpmsg.msg_type == BMP_Route_Monitoring:
                 bgpmsg = bmpmsg.bmp_RM_bgp_message
                 forwarder.send(bgpmsg)
-                local_BGP_processor(bgpmsg)
+                local_BGP_processor(rib,bgpmsg)
             else:
                 sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
 
