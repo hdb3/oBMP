@@ -25,6 +25,8 @@ BGP_TYPE_CODE_LOCAL_PREF = 5
 BGP_TYPE_CODE_ATOMIC_AGGREGATE = 6
 BGP_TYPE_CODE_AGGREGATOR = 7
 BGP_TYPE_CODE_COMMUNITIES = 8
+BGP_TYPE_CODE_MP_REACH_NLRI = 14
+BGP_TYPE_CODE_MP_UNREACH_NLRI = 15
 BGP_TYPE_CODE_AS4_PATH = 17
 BGP_TYPE_CODE_AS4_AGGREGATOR = 18
 BGP_Attribute_Flags_Optional = 0x80 # 1 << 7
@@ -170,76 +172,132 @@ class BGP_message:
             # TODO - check that all of the mandatory attributes are present
 
 
+    def parse_attribute_communities(self,attr,code):
+
+        assert 0 == len(attr) % 4, "BGP community string length not multiple of 4 (%d)" % len(attr)
+
+        community_list = []
+        offset = 0
+        while offset < len(attr):
+            community_list.append(struct.unpack_from('!I', attr, offset=offset)[0])
+            offset += 4
+
+        self.attribute[code] = community_list
+
+    def parse_attribute_AS_path(self,attr,as4=False):
+
+    # an AS path attribute has 1 or more AS segments
+    # each segment is represented by 1 byte segment type + 1 byte segment length + variable number of AS
+    # the 1 byte segment length is a count of AS, not bytes
+    # the ASes are 2 or 4 byte values depending on AS/AS4 attribute nature
+    #
+    # thus the code loops over multiple segments, consuming the attribute payload, only stopping when it runs out of data
+    # each segment is processed by an inner loop, loop count based on the number of ASes in the segment AS count header
+    #
+    # the result is a list of segments, each segment is a tuple (segment type, AS list)
+    #
+
+        if as4:
+            as_size = 4
+            fmt = '!I'
+            code = BGP_TYPE_CODE_AS4_PATH
+        else:
+            as_size = 2
+            fmt = '!H'
+            code = BGP_TYPE_CODE_AS_PATH
+
+        segment_list = []
+        attribute_offset = 0
+        attribute_length = len(attr)
+        while attribute_offset < attribute_length:
+            assert attribute_length - attribute_offset > 4, \
+                    "minimum segment length check length %d offset %d" % (attribute_length,attribute_offset) 
+
+            path_segment_type = struct.unpack_from('!B', attr, offset=attribute_offset)[0]
+            assert path_segment_type == 1 or path_segment_type == 2, \
+                    "check valid AS segment type (SEQUENCE or SET, 1/2) (%d)" % path_segment_type
+
+            path_segment_length = struct.unpack_from('!B', attr, offset=attribute_offset+1)[0]
+            calculated_segment_byte_size = 2 + as_size*path_segment_length
+            remaining_bytes_in_segment = attribute_length - attribute_offset
+            assert remaining_bytes_in_segment >= calculated_segment_byte_size , \
+                    "AS Path attribute length check: remaining_bytes_in_segment >= calculated_segment_byte_size (%d,%d)" % (remaining_bytes_in_segment, calculated_segment_byte_size)
+
+            as_segment = attr[attribute_offset+2:attribute_offset+2+as_size*path_segment_length]
+            as_list = []
+            for i in range(path_segment_length):
+                as_list.append(struct.unpack_from(fmt, as_segment, offset=i*as_size)[0])
+
+            if as_list:
+                segment_list.append((path_segment_type,as_list))
+
+            attribute_offset += calculated_segment_byte_size
+
+        if segment_list:
+            self.attribute[code] = segment_list
+
+    def parse_attribute_4b_4b(self,code,attr):
+            assert len(attr) == 8
+            self.attribute[code] = (struct.unpack_from('!I', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
+
+    def parse_attribute_2b_4b(self,code,attr):
+            assert len(attr) == 6
+            self.attribute[code] = (struct.unpack_from('!H', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
+
+    def parse_attribute_32bits(self,code,attr):
+            assert len(attr) == 4
+            self.attribute[code] = struct.unpack_from('!I', attr, offset=0)[0]
+
+    def parse_attribute_8bits(self,code,attr):
+            assert len(attr) == 1
+            self.attribute[code] = struct.unpack_from('!B', attr, offset=0)[0]
+
+    def parse_attribute_0_length(self,code,attr):
+        assert len(attr) == 0
+        self.attribute[code] = True
+
+    def parse_attribute_unhandled(self,code,attr):
+            self.attribute[code] = attr
+            if not self.unhandled_codes:
+                self.unhandled_codes = [code]
+            else:
+                self.unhandled_codes.append(code)
+
     def parse_attribute(self,flags,code,attr):
 
-        def get_communities(attr):
-            offset = 0
-            mylist = []
-            while offset < len(attr):
-                mylist.append(struct.unpack_from('!I', attr, offset=offset)[0])
-                offset += 4
-            return mylist
-
-        def get_path_ases(as_list):
-            offset = 0
-            mylist = []
-            while offset < len(as_list):
-                mylist.append(struct.unpack_from('!H', as_list, offset=offset)[0])
-                offset += 2
-            return mylist
-
-        def get_path_as4s(as_list):
-            offset = 0
-            mylist = []
-            while offset < len(as_list):
-                mylist.append(struct.unpack_from('!I', as_list, offset=offset)[0])
-                offset += 4
-            return mylist
-
-        attr_len = len(attr)
         if (code==BGP_TYPE_CODE_ORIGIN):
-            assert attr_len == 1
-            self.attribute[BGP_TYPE_CODE_ORIGIN] = struct.unpack_from('!B', attr, offset=0)[0]
+            self.parse_attribute_8bits(code,attr)
+
         elif (code==BGP_TYPE_CODE_AS_PATH):
-            path_segment_type = struct.unpack_from('!B', attr, offset=0)[0]
-            path_segment_length = struct.unpack_from('!B', attr, offset=1)[0]
-            assert attr_len == 2 + 2*path_segment_length, "AS Path attribute length invalid: (attr_len,path_segment_length)=%d,%d" % (attr_len,path_segment_length)
-            ases = get_path_ases(attr[2:attr_len])
-            if BGP_TYPE_CODE_AS_PATH in self.attribute:
-                self.attribute[BGP_TYPE_CODE_AS_PATH].append((path_segment_type,ases))
-            else:
-                self.attribute[BGP_TYPE_CODE_AS_PATH] = [(path_segment_type,ases)]
+            self.parse_attribute_AS_path(attr)
+
         elif (code==BGP_TYPE_CODE_NEXT_HOP):
-            assert attr_len == 4
-            self.attribute[BGP_TYPE_CODE_NEXT_HOP] = struct.unpack_from('!I', attr, offset=0)[0]
+            self.parse_attribute_32bits(code,attr)
+
         elif (code==BGP_TYPE_CODE_MULTI_EXIT_DISC):
-            assert attr_len == 4
-            self.attribute[BGP_TYPE_CODE_MULTI_EXIT_DISC] = struct.unpack_from('!I', attr, offset=0)[0]
+            self.parse_attribute_32bits(code,attr)
+
         elif (code==BGP_TYPE_CODE_LOCAL_PREF):
-            assert attr_len == 4
-            self.attribute[BGP_TYPE_CODE_LOCAL_PREF] = struct.unpack_from('!I', attr, offset=0)[0]
+            self.parse_attribute_32bits(code,attr)
+
         elif (code==BGP_TYPE_CODE_ATOMIC_AGGREGATE):
-            assert attr_len == 0
-            self.attribute[BGP_TYPE_CODE_ATOMIC_AGGREGATE] = True
+            self.parse_attribute_0_length(code,attr)
+
         elif (code==BGP_TYPE_CODE_AGGREGATOR):
-            assert attr_len == 6
-            self.attribute[BGP_TYPE_CODE_AGGREGATOR] = (struct.unpack_from('!H', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
+            self.parse_attribute_2b_4b(code,attr)
+
         elif (code==BGP_TYPE_CODE_COMMUNITIES):
-            assert 0 == attr_len % 4, "BGP community string length not multiple of 4 (%d)" % attr_len
-            self.attribute[BGP_TYPE_CODE_COMMUNITIES] = get_communities(attr)
+            self.parse_attribute_communities(attr,code)
+
         elif (code==BGP_TYPE_CODE_AS4_PATH):
-            path_segment_type = struct.unpack_from('!B', attr, offset=0)[0]
-            path_segment_length = struct.unpack_from('!B', attr, offset=1)[0]
-            assert attr_len == 2 + 4*path_segment_length
-            assert attr_len == 2 + 4*path_segment_length, "AS4 Path attribute length invalid: (attr_len,path_segment_length)=%d,%d" % (attr_len,path_segment_length)
-            ases = get_path_as4s(attr[2:attr_len])
-            if BGP_TYPE_CODE_AS4_PATH in self.attribute:
-                self.attribute[BGP_TYPE_CODE_AS4_PATH].append((path_segment_type,ases))
-            else:
-                self.attribute[BGP_TYPE_CODE_AS4_PATH] = [(path_segment_type,ases)]
+            self.parse_attribute_AS_path(attr,as4=True)
+
         elif (code==BGP_TYPE_CODE_AS4_AGGREGATOR):
-            assert attr_len == 8
-            self.attribute[BGP_TYPE_CODE_AS4_AGGREGATOR] = (struct.unpack_from('!I', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=4)[0])
+            self.parse_attribute_4b_4b(code,attr)
+
+        elif (code==BGP_TYPE_CODE_MP_REACH_NLRI or code == BGP_TYPE_CODE_MP_UNREACH_NLRI):
+            self.parse_attribute_unhandled(code,attr)
+
         else:
             assert False , "Unknown BGP path attribuite type %d" % code
 
