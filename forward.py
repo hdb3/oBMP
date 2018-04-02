@@ -112,6 +112,7 @@ def local_BGP_processor(rib,bgpmsg):
         max_ribsize = ribsize
         sys.stderr.write("RIB size %d\n" % max_ribsize)
         sys.stderr.flush()
+    return parsed_bgp_message.except_flag
 
 
 def forward(collector,target):
@@ -136,8 +137,8 @@ def forward(collector,target):
                 eprint("-- BMP stats report rcvd, length %d" % bmpmsg.length)
             elif bmpmsg.msg_type == BMP_Route_Monitoring:
                 bgpmsg = bmpmsg.bmp_RM_bgp_message
-                forwarder.send(bgpmsg)
-                local_BGP_processor(rib,bgpmsg)
+                if (local_BGP_processor(rib,bgpmsg)):
+                    forwarder.send(bgpmsg)
             else:
                 sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
 
