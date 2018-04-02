@@ -11,7 +11,8 @@ BGP_known_attributes = frozenset([
     BGP_TYPE_CODE_ATOMIC_AGGREGATE,
     BGP_TYPE_CODE_AGGREGATOR,
     BGP_TYPE_CODE_COMMUNITIES,
-    BGP_TYPE_CODE_AS4_PATH ])
+    BGP_TYPE_CODE_AS4_PATH,
+    BGP_TYPE_CODE_AS4_AGGREGATOR ])
 
 
 class BGPrib:
@@ -65,23 +66,26 @@ class BGPrib:
         # these conditions are mostly on code rather than external behaviour
         # the exception is the mandatroty attributes
         # there is no check on the types of attributes (yet)
-        self.validate_prefix(prefix)
-        self.validate_attrs(attrs)
+        try:
+            self.validate_prefix(prefix)
+            self.validate_attrs(attrs)
+        except AssertionError as e:
+            eprint("Validation failure %s" % e)
 
     def validate_attrs(self,attrs):
         keys = ""
+        ##eprint("!!validate_attrs - keys %s" % attrs.keys)
         for k in attrs.keys():
-            assert isinstance(k,int)
-            assert k in BGP_known_attributes
+            assert isinstance(k,int), "attribute code not int error"+str(type(k))
+            assert k in BGP_known_attributes, "unknown attribute %d" % k
             keys += " " + str(k)
-        ##eprint("!!validate_attrs - keys %s" % keys)
-        assert BGP_TYPE_CODE_ORIGIN in attrs
-        assert BGP_TYPE_CODE_AS_PATH in attrs
-        assert BGP_TYPE_CODE_NEXT_HOP in attrs
+        assert BGP_TYPE_CODE_ORIGIN in attrs, "mandatory attribute BGP_TYPE_CODE_ORIGIN missing"
+        assert BGP_TYPE_CODE_AS_PATH in attrs, "mandatory attribute BGP_TYPE_AS_PATH missing"
+        assert BGP_TYPE_CODE_NEXT_HOP in attrs, "mandatory attribute BGP_TYPE_NEXT_HOP missing"
 
     def validate_prefix(self,prefix):
         (length,addr) = prefix
         ##assert isinstance(addr,ipaddress.IPv4Address)
-        assert isinstance(addr,int)
-        assert isinstance(length,int)
-        assert length < 33
+        assert isinstance(addr,int), "prefix not int error"+str(type(k))
+        assert isinstance(length,int), "prefix  lengthnot int error"+str(type(k))
+        assert length < 33, "prefix longer than 32 error"
