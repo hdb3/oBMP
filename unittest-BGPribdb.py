@@ -5,5 +5,7 @@ import bgpparse
 
 print("BGPribdb Unit tests")
 
-rib = BGPribdb
-print rib
+rib = BGPribdb.BGPribdb()
+print (rib)
+
+print("End BGPribdb Unit tests")
