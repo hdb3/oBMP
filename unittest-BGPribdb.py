@@ -62,7 +62,6 @@ update=rib.get_update_request()
 update_count = 0
 update_pfx_count = 0
 while update:
-    print(update)
     update=rib.get_update_request()
     if update:
         (path,pfxs)=update

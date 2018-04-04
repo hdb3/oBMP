@@ -82,16 +82,27 @@ class BGPribdb:
     #
     # if there are no items in either list then the return value is simply 'None'
 
+    def groom_updates(self,pa_hash,pfxlist):
+        new_pfxlist=[]
+        for pfx in pfxlist:
+            if self.rib[pfx] == pa_hash:
+                new_pfxlist.append(pfx)
+        return new_pfxlist
+
+
+        return hash(pickle.dumps(simple, protocol=pickle.HIGHEST_PROTOCOL))
+
     def get_update_request(self):
         if self.refresh_update_requests is None:
             # return withdraws first....
-            if None in self.path_update_requests:
-                return (None,self.path_update_requests.pop(None))
-            else:
-                try:
-                    return self.path_update_requests.popitem()
-                except KeyError:
-                    return(None)
+            try:
+                if None in self.path_update_requests:
+                    (pa_hash,pfxlist) = self.path_update_requests.pop(None)
+                else:
+                    (pa_hash,pfxlist) = self.path_update_requests.popitem()
+                return (pa_hash,self.groom_updates(pa_hash,pfxlist))
+            except KeyError:
+                return(None)
         else:
             if self.refresh_update_requests:
                 return self.refresh_update_requests.pop(0)
