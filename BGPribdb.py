@@ -4,13 +4,14 @@
 # a threadsafe BGP RIB for a router
 #
 
+import threading
+
 class BGPribdb:
     def __init__(self):
+        self.db_lock = threading.Lock()
         self.rib = {}
         self.path_attributes = {}
         self.path_update_requests = {}
-        self.update_requests = {}
-        self.update_requests[None] = []
 
         # refresh_update_requests is a list whilst refresh operation is in progress
         # when it is an empty list then it is time to send end-of-RIB, after which it is set None
@@ -18,7 +19,14 @@ class BGPribdb:
 
     def __str__(self):
         return "BGPribdb state" + \
-               "len(rib)=" + str(len(self.rib))
+               "\nlen(rib)=" + str(len(self.rib)) + \
+               "\nlen(paths)=" + str(len(self.path_attributes))
+
+    def lock(self):
+        self.db_lock.acquire()
+
+    def unlock(self):
+        self.db_lock.release()
 
     @staticmethod
     def path_attribute_hash(pa):
@@ -28,9 +36,14 @@ class BGPribdb:
 
         # ALWAYS update the main RIB
         # UNLESS the RIB is unchanged schedule update sending
-        if self.rib[pfx] != pa_hash:
+        if pa_hash not in self.rib or self.rib[pfx] != pa_hash:
             self.rib[pfx] = pa_hash
             self.path_update_requests[pa_hash].append(pfx)
+        else:
+            # it's not expected that a duplce insert occurs
+            # it's not a problem and it does not call for an UPDATE to be sent
+            sys.stder.write("\n*** Unexpected duplicate inset for %s/%s\n" % pfx,pa_hash)
+            # pass
 
     def atomic_withdraw(self,k):
         atomic_update(pfx,None)
@@ -40,7 +53,7 @@ class BGPribdb:
         pa_hash = hash(pa)
         if pa_hash not in self.path_attributes:
             self.path_attributes[pa_hash] = pa
-            self.refresh_update_requests[pa_hash] = []
+            self.path_update_requests[pa_hash] = []
         for pfx in pfx_list:
             self.atomic_update(pfx,pa_hash)
         self.unlock()
@@ -71,14 +84,18 @@ class BGPribdb:
 
     def get_update_request(self):
         if self.refresh_update_requests is None:
+            # return withdraws first....
+            if None in self.path_update_requests:
+                return (None,self.path_update_requests.pop(None))
+            else:
+                try:
+                    return self.path_update_requests.popitem()
+                except KeyError:
+                    return(None)
+        else:
             if self.refresh_update_requests:
                 return self.refresh_update_requests.pop(0)
             else:
                 self.refresh_update_requests = None
                 return((None,None))
-        elif self.update_requests[None]:
-            return (None,self.update_requests.pop(None))
-        else:
-            return self.update_requests.popitem()
-
 
