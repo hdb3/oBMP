@@ -16,6 +16,10 @@ class BGPribdb:
         # when it is an empty list then it is time to send end-of-RIB, after which it is set None
         self.refresh_update_requests = None
 
+    def __str__(self):
+        return "BGPribdb state" + \
+               "len(rib)=" + str(len(self.rib))
+
     @staticmethod
     def path_attribute_hash(pa):
         return hash(pickle.dumps(simple, protocol=pickle.HIGHEST_PROTOCOL))
@@ -29,7 +33,7 @@ class BGPribdb:
             self.path_update_requests[pa_hash].append(pfx)
 
     def atomic_withdraw(self,k):
-        atomic_update(self,pfx,None):
+        atomic_update(pfx,None)
 
     def update(self,pa,pfx_list):
         self.lock()
@@ -50,7 +54,7 @@ class BGPribdb:
     def refresh(self):
         self.lock()
         self.path_update_requests = {}
-        for (pfx,pa_hash) in self.rib.items()
+        for (pfx,pa_hash) in self.rib.items():
             if pa_hash not in self.refresh_update_requests:
                 self.refresh_update_requests[pa_hash] = []
             self.refresh_update_requests = [pa_hash].append(pfx)
