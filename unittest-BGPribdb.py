@@ -81,15 +81,20 @@ class Test():
         update=rib.get_update_request()
         update_count = 0
         update_pfx_count = 0
+        withdraw_pfx_count = 0
         while update:
             update=rib.get_update_request()
             if update:
                 (path,pfxs)=update
                 update_count += 1
-                update_pfx_count += len(pfxs)
+                if path:
+                    update_pfx_count += len(pfxs)
+                else:
+                    withdraw_pfx_count += len(pfxs)
 
         print("update_count %d" % update_count)
         print("update_pfx_count %d" % update_pfx_count)
+        print("withdraw_pfx_count_pfx_count %d" % withdraw_pfx_count)
 
 
 def main(tc):
@@ -99,8 +104,10 @@ def main(tc):
     rib = BGPribdb.BGPribdb()
     test.insert_test(rib)
     print(rib)
-    #test.update_test(rib)
+    test.update_test(rib)
+    print(rib)
     #test.withdraw_test(rib)
+    #print(rib)
     test.request_test(rib)
     elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
