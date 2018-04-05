@@ -12,6 +12,7 @@ class BGPribdb:
         self.rib = {}
         self.path_attributes = {}
         self.path_update_requests = {}
+        self.path_update_requests[None] = []
 
         # refresh_update_requests is a list whilst refresh operation is in progress
         # when it is an empty list then it is time to send end-of-RIB, after which it is set None
@@ -45,8 +46,8 @@ class BGPribdb:
             sys.stder.write("\n*** Unexpected duplicate inset for %s/%s\n" % pfx,pa_hash)
             # pass
 
-    def atomic_withdraw(self,k):
-        atomic_update(pfx,None)
+    def atomic_withdraw(self,pfx):
+        self.atomic_update(pfx,None)
 
     def update(self,pa,pfx_list):
         self.lock()
@@ -58,19 +59,22 @@ class BGPribdb:
             self.atomic_update(pfx,pa_hash)
         self.unlock()
 
-    def withdraw(self,k_list):
+    def withdraw(self,pfx_list):
         self.lock()
-        for pfx in pfx_list.keys():
+        for pfx in pfx_list:
             self.atomic_withdraw(pfx)
         self.unlock()
 
     def refresh(self):
         self.lock()
         self.path_update_requests = {}
+        self.path_update_requests[None] = []
         for (pfx,pa_hash) in self.rib.items():
-            if pa_hash not in self.refresh_update_requests:
-                self.refresh_update_requests[pa_hash] = []
-            self.refresh_update_requests = [pa_hash].append(pfx)
+            # don't put withdraws into the refresh table
+            if pa_hash:
+                if pa_hash not in self.refresh_update_requests:
+                    self.refresh_update_requests[pa_hash] = []
+                self.refresh_update_requests = [pa_hash].append(pfx)
         self.unlock()
 
     # consume API
@@ -89,15 +93,13 @@ class BGPribdb:
                 new_pfxlist.append(pfx)
         return new_pfxlist
 
-
-        return hash(pickle.dumps(simple, protocol=pickle.HIGHEST_PROTOCOL))
-
     def get_update_request(self):
         if self.refresh_update_requests is None:
             # return withdraws first....
             try:
                 if None in self.path_update_requests:
-                    (pa_hash,pfxlist) = self.path_update_requests.pop(None)
+                    pa_hash = None
+                    pfxlist = self.path_update_requests.pop(None)
                 else:
                     (pa_hash,pfxlist) = self.path_update_requests.popitem()
                 return (pa_hash,self.groom_updates(pa_hash,pfxlist))

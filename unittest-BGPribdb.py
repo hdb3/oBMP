@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+TC=10
 import random
 import BGPribdb
 import bgpparse
@@ -33,44 +34,75 @@ def get_old_test_prefix():
     global test_prefixes
     return random.choice(test_prefixes)
 
+def rmv_old_test_prefix():
+    global test_prefixes
+    if test_prefixes:
+        item = random.choice(test_prefixes)
+        test_prefixes.remove(item)
+        return item
+    else:
+        print("rmv_old_test_prefix returns None")
+        return None
 
-print("BGPribdb Unit tests")
 
-make_test_paths()
+def insert_test():
+    print("******inserting test")
+    for i in range(TC):
+        path = get_test_path()
+        prefixes = []
+        for j in range(random.randint(1,10)):
+            prefixes.append(get_new_test_prefix())
+        rib.update(path,prefixes)
 
-rib = BGPribdb.BGPribdb()
+def update_test():
+    print("******updating test")
+    for i in range(TC):
+        path = get_test_path()
+        prefixes = []
+        for j in range(random.randint(1,10)):
+            prefixes.append(get_old_test_prefix())
+        rib.update(path,prefixes)
 
-print (rib)
+def withdraw_test():
+    print("******withdrawing test")
+    while True:
+        prefixes = []
+        for j in range(random.randint(1,10)):
+            pfx=rmv_old_test_prefix()
+            if pfx:
+                prefixes.append(pfx)
+            else:
+                break
+        if prefixes:
+            rib.withdraw(prefixes)
+        else:
+            break
 
-for i in range(10000):
-    path = get_test_path()
-    prefixes = []
-    for j in range(random.randint(1,10)):
-        prefixes.append(get_new_test_prefix())
-    rib.update(path,prefixes)
+def request_test():
+    print("******request updates test")
 
-for i in range(10000):
-    path = get_test_path()
-    prefixes = []
-    for j in range(random.randint(1,10)):
-        prefixes.append(get_old_test_prefix())
-    rib.update(path,prefixes)
-
-print (rib)
-
-update=rib.get_update_request()
-update_count = 0
-update_pfx_count = 0
-while update:
     update=rib.get_update_request()
-    if update:
-        (path,pfxs)=update
-        update_count += 1
-        update_pfx_count += len(pfxs)
+    update_count = 0
+    update_pfx_count = 0
+    while update:
+        update=rib.get_update_request()
+        if update:
+            (path,pfxs)=update
+            update_count += 1
+            update_pfx_count += len(pfxs)
 
-print("update_count %d" % update_count)
-print("update_pfx_count %d" % update_pfx_count)
-print (rib)
+    print("update_count %d" % update_count)
+    print("update_pfx_count %d" % update_pfx_count)
 
 
-print("End BGPribdb Unit tests")
+def main():
+    print("BGPribdb Unit tests")
+    make_test_paths()
+    rib = BGPribdb.BGPribdb()
+    insert_test()
+    #update_test()
+    #withdraw_test()
+    request_test()
+    print("End BGPribdb Unit tests")
+
+main()
