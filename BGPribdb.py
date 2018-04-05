@@ -29,12 +29,12 @@ class BGPribdb:
             else:
                 prefixes_in_withdraw += len(pfxlist)
 
-        return "BGPribdb state" + \
-               "\nlen(rib)=" + str(len(self.rib)) + \
-               "\nlen(paths)=" + str(len(self.path_attributes)) + \
-               "\npa_hashes_in_update=" + str(pa_hashes_in_update) + \
-               "\nprefixes_in_update=" + str(prefixes_in_update) + \
-               "\nprefixes_in_withdraw=" + str(prefixes_in_withdraw)
+        return "**BGPribdb state**" + \
+               "\n  rib size =" + str(len(self.rib)) + \
+               "\n  paths in rib =" + str(len(self.path_attributes)) + \
+               "\n  paths in update =" + str(pa_hashes_in_update) + \
+               "\n  prefixes in update =" + str(prefixes_in_update) + \
+               "\n  prefixes in withdraw =" + str(prefixes_in_withdraw)
 
     def lock(self):
         self.db_lock.acquire()
@@ -102,8 +102,21 @@ class BGPribdb:
     def groom_updates(self,pa_hash,pfxlist):
         new_pfxlist=[]
         for pfx in pfxlist:
+            ## debug code
+            if not pa_hash:## debug code
+                pa_tmp1 = 0## debug code
+            else:## debug code
+                pa_tmp1 = pa_hash## debug code
+            if not self.rib[pfx]:## debug code
+                pa_tmp2 = 0## debug code
+            else:## debug code
+                pa_tmp2 = self.rib[pfx]  ## debug code
+            ## end debug code
             if self.rib[pfx] == pa_hash:
                 new_pfxlist.append(pfx)
+                print("groom_updates - using update %0X:%d %0X/%0X" % (pfx[0],pfx[1],pa_tmp1,pa_tmp2))## debug code
+            else:## debug code
+                print("groom_updates - dropping update %0X:%d %0X/%0X" % (pfx[0],pfx[1],pa_tmp1,pa_tmp2))## debug code
         return new_pfxlist
 
     def get_update_request(self):
