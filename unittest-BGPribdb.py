@@ -120,7 +120,21 @@ def main(tc):
         test.request_test(rib)
 
     def test2():
-        print("*** Test 2")
+        print("*** Test 1")
+        print("loop testing the refresh function")
+        for i in range(10):
+            test.insert_test(rib)
+            test.request_test(rib)
+            test.refresh_test(rib)
+            test.insert_test(rib)
+            test.request_test(rib)
+            test.insert_test(rib)
+            test.refresh_test(rib)
+            test.request_test(rib)
+        print(rib)
+
+    def testx():
+        print("*** Test x")
         #test.insert_test(rib)
         #print(rib)
         #test.update_test(rib)
@@ -140,7 +154,7 @@ def main(tc):
     test=Test(tc)
     print("BGPribdb Unit tests")
     rib = BGPribdb.BGPribdb()
-    test1()
+    test2()
     elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
     print("TC was %d, time was %f, time/TC=%fuS" % (tc,elapsed_time,elapsed_time/tc*1000000))
