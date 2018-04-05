@@ -107,25 +107,40 @@ class Test():
 
 
 def main(tc):
+
+    def test1():
+        print("*** Test 1")
+        print("testing the refresh function")
+        test.insert_test(rib)
+        test.request_test(rib)
+        test.request_test(rib)
+        test.refresh_test(rib)
+        print(rib)
+        test.request_test(rib)
+        test.request_test(rib)
+
+    def test2():
+        print("*** Test 2")
+        #test.insert_test(rib)
+        #print(rib)
+        #test.update_test(rib)
+        #print(rib)
+        #test.withdraw_test(rib)
+        #print(rib)
+        #test.request_test(rib)
+        test.insert_test(rib)
+        test.request_test(rib)
+        test.insert_test(rib)
+        test.request_test(rib)
+        test.refresh_test(rib)
+        test.request_test(rib)
+        print(rib)
+
     start_time = time.perf_counter()
     test=Test(tc)
     print("BGPribdb Unit tests")
     rib = BGPribdb.BGPribdb()
-    #test.insert_test(rib)
-    #print(rib)
-    #test.update_test(rib)
-    #print(rib)
-    #test.withdraw_test(rib)
-    #print(rib)
-    #test.request_test(rib)
-    test.insert_test(rib)
-    test.request_test(rib)
-    test.insert_test(rib)
-    test.request_test(rib)
-    test.refresh_test(rib)
-    test.request_test(rib)
-    print(rib)
-
+    test1()
     elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
     print("TC was %d, time was %f, time/TC=%fuS" % (tc,elapsed_time,elapsed_time/tc*1000000))
