@@ -116,14 +116,22 @@ class BGPribdb:
 
     def refresh(self):
         self.lock()
+
+        # zero out normal update actions queued
         self.path_update_requests = {}
         self.path_update_requests[None] = []
+        self.update_requests = {}
+
+        self.refresh_update_requests = {}
+        ###print("0"+str(type(self.refresh_update_requests)))
         for (pfx,pa_hash) in self.rib.items():
             # don't put withdraws into the refresh table
             if pa_hash:
+                ###print("1"+str(type(self.refresh_update_requests)))
                 if pa_hash not in self.refresh_update_requests:
                     self.refresh_update_requests[pa_hash] = []
-                self.refresh_update_requests = [pa_hash].append(pfx)
+                self.refresh_update_requests[pa_hash].append(pfx)
+        self.refresh_update_requests = {}
         self.unlock()
 
     # consume API
@@ -134,26 +142,6 @@ class BGPribdb:
     # the last item from a refresh list is (None,None), which signals 'end-of-RIB'
     #
     # if there are no items in either list then the return value is simply 'None'
-
-    def old_groom_updates(self,pa_hash,pfxlist):
-        new_pfxlist=[]
-        for pfx in pfxlist:
-            ## debug code
-            if not pa_hash:## debug code
-                pa_tmp1 = 0## debug code
-            else:## debug code
-                pa_tmp1 = pa_hash## debug code
-            if not self.rib[pfx]:## debug code
-                pa_tmp2 = 0## debug code
-            else:## debug code
-                pa_tmp2 = self.rib[pfx]  ## debug code
-            ## end debug code
-            if self.rib[pfx] == pa_hash:
-                new_pfxlist.append(pfx)
-                print("groom_updates - using update %s %0X/%0X" % (self.show_pfx(pfx),pa_tmp1,pa_tmp2))## debug code
-            else:## debug code
-                print("groom_updates - dropping update %s %0X/%0X" % (self.show_pfx(pfx),pa_tmp1,pa_tmp2))## debug code
-        return new_pfxlist
 
     def groom_updates(self,pa_hash,pfxlist):
         new_pfxlist=[]
