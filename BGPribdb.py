@@ -11,6 +11,7 @@ class BGPribdb:
         self.db_lock = threading.Lock()
         self.rib = {}
         self.path_attributes = {}
+        self.update_requests = {}
         self.path_update_requests = {}
         self.path_update_requests[None] = []
 
@@ -19,28 +20,61 @@ class BGPribdb:
         self.refresh_update_requests = None
 
     def __str__(self):
+
+
+        # calculate the global update state
         pa_hashes_in_update = 0
         prefixes_in_update = 0
         prefixes_in_withdraw = 0
-        for (pa_hash,pfxlist) in self.path_update_requests.items():
-            pa_hashes_in_update += 1
+        pa_hashes = {}
+        for (pfx,pa_hash) in self.update_requests:
             if pa_hash:
-                prefixes_in_update += len(pfxlist)
+                prefixes_in_update += 1
             else:
-                prefixes_in_withdraw += len(pfxlist)
+                prefixes_in_withdraw += 1
+            if not pa_hash in pa_hashes:
+                pa_hashes[pa_hash] = 1
+            else:
+                pa_hashes[pa_hash] += 1
+
+
+
+
+        # calculate the per path update state
+        path_pa_hashes_in_update = 0
+        path_prefixes_in_update = 0
+        path_prefixes_in_withdraw = 0
+        for (pa_hash,pfxlist) in self.path_update_requests.items():
+            path_pa_hashes_in_update += 1
+            if pa_hash:
+                path_prefixes_in_update += len(pfxlist)
+            else:
+                path_prefixes_in_withdraw += len(pfxlist)
 
         return "**BGPribdb state**" + \
+\
                "\n  rib size =" + str(len(self.rib)) + \
                "\n  paths in rib =" + str(len(self.path_attributes)) + \
-               "\n  paths in update =" + str(pa_hashes_in_update) + \
-               "\n  prefixes in update =" + str(prefixes_in_update) + \
-               "\n  prefixes in withdraw =" + str(prefixes_in_withdraw)
+\
+               "\n  *global view* paths in update =" + str(pa_hashes_in_update) + \
+               "\n  *global view* prefixes in update =" + str(prefixes_in_update) + \
+               "\n  *global view* prefixes in withdraw =" + str(prefixes_in_withdraw) + \
+\
+               "\n  *path view* paths in update =" + str(path_pa_hashes_in_update) + \
+               "\n  *path view* prefixes in update =" + str(path_prefixes_in_update) + \
+               "\n  *path view* prefixes in withdraw =" + str(path_prefixes_in_withdraw)
 
     def lock(self):
         self.db_lock.acquire()
 
     def unlock(self):
         self.db_lock.release()
+
+
+    @staticmethod
+    def show_pfx(pfx):
+        import ipaddress
+        return str(ipaddress.ip_address(pfx[0]))+"/"+str(int(pfx[1]))
 
     @staticmethod
     def path_attribute_hash(pa):
@@ -53,10 +87,11 @@ class BGPribdb:
         if pa_hash not in self.rib or self.rib[pfx] != pa_hash:
             self.rib[pfx] = pa_hash
             self.path_update_requests[pa_hash].append(pfx)
+            self.update_requests[pfx] = pa_hash
         else:
             # it's not expected that a duplce insert occurs
             # it's not a problem and it does not call for an UPDATE to be sent
-            sys.stder.write("\n*** Unexpected duplicate inset for %s/%s\n" % pfx,pa_hash)
+            sys.stder.write("\n*** Unexpected duplicate inset for %s/%s\n" % (self.show_pfx(pfx),pa_hash))
             # pass
 
     def atomic_withdraw(self,pfx):
@@ -67,6 +102,7 @@ class BGPribdb:
         pa_hash = hash(pa)
         if pa_hash not in self.path_attributes:
             self.path_attributes[pa_hash] = pa
+        if pa_hash not in self.path_update_requests:
             self.path_update_requests[pa_hash] = []
         for pfx in pfx_list:
             self.atomic_update(pfx,pa_hash)
@@ -99,7 +135,7 @@ class BGPribdb:
     #
     # if there are no items in either list then the return value is simply 'None'
 
-    def groom_updates(self,pa_hash,pfxlist):
+    def old_groom_updates(self,pa_hash,pfxlist):
         new_pfxlist=[]
         for pfx in pfxlist:
             ## debug code
@@ -114,9 +150,21 @@ class BGPribdb:
             ## end debug code
             if self.rib[pfx] == pa_hash:
                 new_pfxlist.append(pfx)
-                print("groom_updates - using update %0X:%d %0X/%0X" % (pfx[0],pfx[1],pa_tmp1,pa_tmp2))## debug code
+                print("groom_updates - using update %s %0X/%0X" % (self.show_pfx(pfx),pa_tmp1,pa_tmp2))## debug code
             else:## debug code
-                print("groom_updates - dropping update %0X:%d %0X/%0X" % (pfx[0],pfx[1],pa_tmp1,pa_tmp2))## debug code
+                print("groom_updates - dropping update %s %0X/%0X" % (self.show_pfx(pfx),pa_tmp1,pa_tmp2))## debug code
+        return new_pfxlist
+
+    def groom_updates(self,pa_hash,pfxlist):
+        new_pfxlist=[]
+        for pfx in pfxlist:
+            if pfx in self.rib and self.rib[pfx] == pa_hash and pfx in self.update_requests and self.update_requests[pfx] == pa_hash:
+                ## print("groom_updates - using update %s %0X/%0X" % (self.show_pfx(pfx),pa_hash,self.update_requests[pfx]))## debug code
+                new_pfxlist.append(pfx)
+                del self.update_requests[pfx]
+            else:
+                ## print("groom_updates - dropping update %s %d %0X/%0X" % (self.show_pfx(pfx),int(pfx in self.update_requests),pa_hash,self.update_requests[pfx]))## debug code
+                pass
         return new_pfxlist
 
     def get_update_request(self):

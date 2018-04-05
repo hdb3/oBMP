@@ -106,9 +106,14 @@ def main(tc):
     print(rib)
     test.update_test(rib)
     print(rib)
-    #test.withdraw_test(rib)
-    #print(rib)
+    test.withdraw_test(rib)
+    print(rib)
     test.request_test(rib)
+    test.insert_test(rib)
+    test.update_test(rib)
+    test.request_test(rib)
+    print(rib)
+
     elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
     print("TC was %d, time was %f, time/TC=%fuS" % (tc,elapsed_time,elapsed_time/tc*1000000))
