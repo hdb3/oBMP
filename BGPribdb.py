@@ -123,15 +123,13 @@ class BGPribdb:
         self.update_requests = {}
 
         self.refresh_update_requests = {}
-        ###print("0"+str(type(self.refresh_update_requests)))
         for (pfx,pa_hash) in self.rib.items():
             # don't put withdraws into the refresh table
             if pa_hash:
-                ###print("1"+str(type(self.refresh_update_requests)))
                 if pa_hash not in self.refresh_update_requests:
                     self.refresh_update_requests[pa_hash] = []
                 self.refresh_update_requests[pa_hash].append(pfx)
-        self.refresh_update_requests = {}
+                ## print("refresh - using update %s %0X" % (self.show_pfx(pfx),pa_hash))## debug code
         self.unlock()
 
     # consume API
@@ -164,12 +162,12 @@ class BGPribdb:
                     pfxlist = self.path_update_requests.pop(None)
                 else:
                     (pa_hash,pfxlist) = self.path_update_requests.popitem()
-                return (pa_hash,self.groom_updates(pa_hash,pfxlist))
+                return (self.path_attributes[pa_hash],self.groom_updates(pa_hash,pfxlist))
             except KeyError:
                 return(None)
         else:
             if self.refresh_update_requests:
-                return self.refresh_update_requests.pop(0)
+                return self.refresh_update_requests.popitem()
             else:
                 self.refresh_update_requests = None
                 return((None,None))
