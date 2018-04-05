@@ -5,6 +5,7 @@
 #
 
 import threading
+import pickle
 
 class BGPribdb:
     def __init__(self):
@@ -78,7 +79,7 @@ class BGPribdb:
 
     @staticmethod
     def path_attribute_hash(pa):
-        return hash(pickle.dumps(simple, protocol=pickle.HIGHEST_PROTOCOL))
+        return hash(pickle.dumps(pa, protocol=pickle.HIGHEST_PROTOCOL))
 
     def atomic_update(self,pfx,pa_hash):
 
@@ -99,7 +100,8 @@ class BGPribdb:
 
     def update(self,pa,pfx_list):
         self.lock()
-        pa_hash = hash(pa)
+        pa_hash = BGPribdb.path_attribute_hash(pa)
+        ##pa_hash = hash(pa)
         if pa_hash not in self.path_attributes:
             self.path_attributes[pa_hash] = pa
         if pa_hash not in self.path_update_requests:
