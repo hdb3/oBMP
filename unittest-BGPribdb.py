@@ -1,16 +1,18 @@
 #!/usr/bin/python3
 
-TC=10
 import random
 import BGPribdb
 import bgpparse
+import sys
+import time
 
 class Object():
     pass
 
 class Test():
-    def __init__(self):
+    def __init__(self,tc):
 
+        self.tc = tc
         self.test_prefixes=[]
         self.test_paths=[]
         for i in range(100):
@@ -42,7 +44,7 @@ class Test():
 
     def insert_test(self,rib):
         print("******inserting test")
-        for i in range(TC):
+        for i in range(tc):
             path = self.get_test_path()
             prefixes = []
             for j in range(random.randint(1,10)):
@@ -51,7 +53,7 @@ class Test():
 
     def update_test(self,rib):
         print("******updating test")
-        for i in range(TC):
+        for i in range(tc):
             path = self.get_test_path()
             prefixes = []
             for j in range(random.randint(1,10)):
@@ -90,8 +92,9 @@ class Test():
         print("update_pfx_count %d" % update_pfx_count)
 
 
-def main():
-    test=Test()
+def main(tc):
+    start_time = time.perf_counter()
+    test=Test(tc)
     print("BGPribdb Unit tests")
     rib = BGPribdb.BGPribdb()
     test.insert_test(rib)
@@ -99,6 +102,13 @@ def main():
     #test.update_test(rib)
     #test.withdraw_test(rib)
     test.request_test(rib)
+    elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
+    print("TC was %d, time was %f, time/TC=%fuS" % (tc,elapsed_time,elapsed_time/tc*1000000))
 
-main()
+if len(sys.argv) > 1:
+    try:
+        tc = int(sys.argv[1])
+    except:
+        tc = 10
+main(tc)
