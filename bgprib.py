@@ -1,5 +1,6 @@
 
 from bgpparse import *
+import BGPribdb
 ##import ipaddress
 
 analyse_withdraws = False
@@ -26,7 +27,8 @@ class BGPrib:
 
     def __init__(self):
         self.RIB = {}
-        self.last_update = None
+        ## self.last_update = None
+        self.ribDB = BGPribdb()
         # a RIB entry contains a prefix and lots besides
         # to enforce this, use a method 'update', which adds entries and replaces
         # existing ones (with an action)
@@ -39,28 +41,18 @@ class BGPrib:
         self.validate_prefix(prefix)
         return self.RIB.key(prefix)
 
-    def update(self,prefix,attrs):
-        if self.validate(prefix,attrs):
-            previous = self.RIB.get(prefix)
-            if previous:
-                self.report(prefix,attrs,previous)
-            self.RIB[prefix] = attrs
-            self.last_update = (prefix,attrs)
+    def update(self,prefixes,attrs):
+        if self.self.validate_attrs(attrs):
+            ## self.RIB[prefix] = attrs
+            self.ribDB.update(attrs,prefixes)
 
-    def withdraw(self,prefix):
-        self.validate_prefix(prefix)
-        global analyse_withdraws
-        if not analyse_withdraws:
-            try:
-                del self.RIB[prefix]
-            except  KeyError:
-                pass
-        else:
-        ## if you want to analyse withdraws, the follwoing code will do it
-            previous = self.RIB.get(prefix)
-            if previous:
-                self.reportw(prefix,previous)
-                del self.RIB[prefix]
+    def withdraw(self,prefixes):
+        self.ribDB.withdraw(prefixes)
+
+        ## try:
+            ## del self.RIB[prefix]
+        ## except  KeyError:
+            ## pass
 
     def report(self,prefix,attrs,previous):
         global analyse_replacements

@@ -14,9 +14,10 @@ from time import sleep
 import pprint
 
 from oBMPparse import oBMP_parse
-from bgpparse import *
-from bgprib import *
-from bmpparse import *
+import bgpparse
+import bmpparse
+# from bgpparse import *
+import BGPribdb
 
 # kafka library and snappy installed via 'pip install kafka-python python-snappy'
 # snappy also requires dev headers - apt install libsnappy-dev
@@ -98,46 +99,10 @@ class Forwarder(threading.Thread):
 
 max_ribsize = 0
 
-def local_BGP_processor(rib,bgpmsg):
-    global max_ribsize, parsed_bgp_message
-    parsed_bgp_message = BGP_message(bgpmsg)
-    for withdrawn_prefix in parsed_bgp_message.withdrawn_prefixes:
-        rib.withdraw(withdrawn_prefix)
-    ##eprint("parsed_bgp_message %s\n" % parsed_bgp_message)
-    ##eprint("parsed_bgp_message.attribute %s\n" % pprint.pformat(parsed_bgp_message.attribute))
-    for updated_prefixes in parsed_bgp_message.prefixes:
-        rib.update(updated_prefixes,parsed_bgp_message.attribute)
-    ribsize = len(rib.get_rib())
-    if ribsize > max_ribsize:
-        max_ribsize = ribsize
-        ## sys.stderr.write("RIB size %d\n" % max_ribsize)
-        ## sys.stderr.flush()
-    return parsed_bgp_message.except_flag
-
-def status_report():
-    global rib
-    ribsize = len(rib.get_rib())
-    sys.stderr.write("RIB size/max size %d/%d\n" % (ribsize,max_ribsize))
-    sys.stderr.flush()
-    print("###########################################################")
-    print("Status report")
-    print("RIB size/max size %d/%d\n" % (ribsize,max_ribsize))
-    print("**********************")
-    print("random RIB entry")
-    print("**********************")
-    print(str(rib.last_update))
-    print("**********************")
-    print("last UPDATE")
-    print("**********************")
-    global parsed_bgp_message
-    print(str(parsed_bgp_message))
-    print("###########################################################")
-
 def forward(collector,target):
     forwarder = Forwarder(target['host'],target['port'])
     forwarder.start()
-    global rib
-    rib = BGPrib()
+    rib = BGPribdb.BGPribdb()
 
     consumer = KafkaConsumer(bootstrap_servers=collector['bootstrap_servers'],client_id=collector['client_id'],group_id=collector['group_id'])
     consumer.subscribe(topics=collector['topic'])
@@ -150,15 +115,19 @@ def forward(collector,target):
         messages_received += 1
         raw_msg = oBMP_parse(message.value)
 
-        bmpmsgs = get_BMP_messages(raw_msg)
+        bmpmsgs = bmpparse.get_BMP_messages(raw_msg)
         for bmpmsg in bmpmsgs:
-            if bmpmsg.msg_type == BMP_Statistics_Report:
-                eprint("-- BMP stats report rcvd, length %d" % bmpmsg.length)
-                status_report()
-            elif bmpmsg.msg_type == BMP_Route_Monitoring:
+            if bmpmsg.msg_type == bmpparse.BMP_Statistics_Report:
+                print("-- BMP stats report rcvd, length %d" % bmpmsg.length)
+                print(rib)
+            elif bmpmsg.msg_type == bmpparse.BMP_Route_Monitoring:
                 bgpmsg = bmpmsg.bmp_RM_bgp_message
-                if (local_BGP_processor(rib,bgpmsg)):
+                parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
+                rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
+                if parsed_bgp_message.except_flag:
                     forwarder.send(bgpmsg)
+                else:
+                    rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
             else:
                 sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
 

@@ -65,6 +65,7 @@ class BGP_message:
     def __str__(self):
         return str(pformat(vars(self)))
 
+
     def parse_bgp_open(self,msg):
         self.bgp_open_version = struct.unpack_from('!B', msg, offset=0)[0]
         self.bgp_open_AS = struct.unpack_from('!H', msg, offset=1)[0]
@@ -162,6 +163,22 @@ class BGP_message:
                 eprint("++failed to parse attribute : error: %s" % e)
                 eprint("++failed to parse attribute : %d %s" % (attributes_len,hexlify(attributes)))
             offset += length+quantum
+
+        
+        if len(self.prefixes) > 0:
+
+            if BGP_TYPE_CODE_ORIGIN not in self.attribute:
+                eprint("mandatory attribute BGP_TYPE_CODE_ORIGIN missing")
+                self.except_flag = True
+            if BGP_TYPE_CODE_AS_PATH not in self.attribute:
+                eprint("mandatory attribute BGP_TYPE_CODE_AS_PATH missing")
+                self.except_flag = True
+            if BGP_TYPE_CODE_NEXT_HOP not in self.attribute:
+                eprint("mandatory attribute BGP_TYPE_CODE_NEXT_HOP missing")
+                self.except_flag = True
+        else:
+            assert len(self.prefixes) == 0, "check for processing NLRI before attributes failed"
+        
 
     def parse_attribute_communities(self,attr,code):
 
