@@ -19,9 +19,22 @@ class BGPribdb:
         self.refresh_update_requests = None
 
     def __str__(self):
+        pa_hashes_in_update = 0
+        prefixes_in_update = 0
+        prefixes_in_withdraw = 0
+        for (pa_hash,pfxlist) in self.path_update_requests.items():
+            pa_hashes_in_update += 1
+            if pa_hash:
+                prefixes_in_update += len(pfxlist)
+            else:
+                prefixes_in_withdraw += len(pfxlist)
+
         return "BGPribdb state" + \
                "\nlen(rib)=" + str(len(self.rib)) + \
-               "\nlen(paths)=" + str(len(self.path_attributes))
+               "\nlen(paths)=" + str(len(self.path_attributes)) + \
+               "\npa_hashes_in_update=" + str(pa_hashes_in_update) + \
+               "\nprefixes_in_update=" + str(prefixes_in_update) + \
+               "\nprefixes_in_withdraw=" + str(prefixes_in_withdraw)
 
     def lock(self):
         self.db_lock.acquire()

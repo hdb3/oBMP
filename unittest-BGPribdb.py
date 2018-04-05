@@ -9,7 +9,7 @@ class Object():
     pass
 
 class Test():
-    __init(self)__:
+    def __init__(self):
 
         self.test_prefixes=[]
         self.test_paths=[]
@@ -17,21 +17,21 @@ class Test():
             path = Object()
             path.a = random.randint(0,0xffffffff)
             path.b = random.randint(0,0xffffffff)
-            test_paths.append(path)
+            self.test_paths.append(path)
 
-    def get_test_path():
+    def get_test_path(self):
         return random.choice(self.test_paths)
 
 
-    def get_new_test_prefix():
+    def get_new_test_prefix(self):
         prefix = ( random.randint(0,0xffffffff), random.randint(0,32))
         self.test_prefixes.append(prefix)
         return prefix
 
-    def get_old_test_prefix():
+    def get_old_test_prefix(self):
         return random.choice(self.test_prefixes)
 
-    def rmv_old_test_prefix():
+    def rmv_old_test_prefix(self):
         if self.test_prefixes:
             item = random.choice(self.test_prefixes)
             self.test_prefixes.remove(item)
@@ -40,7 +40,7 @@ class Test():
             print("rmv_old_test_prefix returns None")
             return None
 
-    def insert_test(rib):
+    def insert_test(self,rib):
         print("******inserting test")
         for i in range(TC):
             path = self.get_test_path()
@@ -49,7 +49,7 @@ class Test():
                 prefixes.append(self.get_new_test_prefix())
             rib.update(path,prefixes)
 
-    def update_test(rib):
+    def update_test(self,rib):
         print("******updating test")
         for i in range(TC):
             path = self.get_test_path()
@@ -58,7 +58,7 @@ class Test():
                 prefixes.append(self.get_old_test_prefix())
             rib.update(path,prefixes)
 
-    def withdraw_test(rib):
+    def withdraw_test(self,rib):
         print("******withdrawing test")
         while True:
             prefixes = []
@@ -73,7 +73,7 @@ class Test():
             else:
                 break
 
-    def request_test(rib):
+    def request_test(self,rib):
         print("******request updates test")
 
         update=rib.get_update_request()
@@ -94,10 +94,11 @@ def main():
     test=Test()
     print("BGPribdb Unit tests")
     rib = BGPribdb.BGPribdb()
-    insert_test(rib)
-    #update_test(rib)
-    #withdraw_test(rib)
-    request_test(rib)
+    test.insert_test(rib)
+    print(rib)
+    #test.update_test(rib)
+    #test.withdraw_test(rib)
+    test.request_test(rib)
     print("End BGPribdb Unit tests")
 
 main()
