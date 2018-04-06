@@ -81,7 +81,6 @@ class Test():
         withdraw_pfx_count = 0
         end_of_RIB = False
         while update:
-            update=rib.get_update_request()
             if update:
                 (path,pfxs)=update
                 update_count += 1
@@ -91,6 +90,7 @@ class Test():
                     withdraw_pfx_count += len(pfxs)
                 else:
                     end_of_RIB = True
+            update=rib.get_update_request()
 
         print("update_count %d" % update_count)
         print("update_pfx_count %d" % update_pfx_count)
