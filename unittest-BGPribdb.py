@@ -14,6 +14,7 @@ class Test():
 
         self.tc = tc
         self.test_prefixes=[]
+        self.test_prefixes_removed=[]
         self.test_paths=[]
         for i in range(100):
             path = Object()
@@ -33,14 +34,27 @@ class Test():
     def get_old_test_prefix(self):
         return random.choice(self.test_prefixes)
 
+    def get_rmvd_test_prefix(self):
+        return random.choice(self.test_prefixes_removed)
+
     def rmv_old_test_prefix(self):
         if self.test_prefixes:
             item = random.choice(self.test_prefixes)
             self.test_prefixes.remove(item)
+            self.test_prefixes_removed.append(item)
             return item
         else:
             print("rmv_old_test_prefix returns None")
             return None
+
+    def reinsert_test(self,rib):
+        print("******reinserting test")
+        for i in range(tc):
+            path = self.get_test_path()
+            prefixes = []
+            for j in range(random.randint(1,10)):
+                prefixes.append(self.get_rmvd_test_prefix())
+            rib.update(path,prefixes)
 
     def insert_test(self,rib):
         print("******inserting test")
@@ -57,11 +71,29 @@ class Test():
             path = self.get_test_path()
             prefixes = []
             for j in range(random.randint(1,10)):
-                prefixes.append(self.get_old_test_prefix())
+                try:
+                    prefixes.append(self.get_old_test_prefix())
+                except IndexError:
+                    break
             rib.update(path,prefixes)
 
     def withdraw_test(self,rib):
         print("******withdrawing test")
+        for i in range(tc):
+            prefixes = []
+            for j in range(random.randint(1,10)):
+                pfx=self.rmv_old_test_prefix()
+                if pfx:
+                    prefixes.append(pfx)
+                else:
+                    break
+            if prefixes:
+                rib.withdraw(prefixes)
+            else:
+                break
+
+    def withdraw_all_test(self,rib):
+        print("******withdrawing all test")
         while True:
             prefixes = []
             for j in range(random.randint(1,10)):
@@ -120,7 +152,25 @@ def main(tc):
         test.request_test(rib)
 
     def test2():
-        print("*** Test 1")
+        print("*** Test 2")
+        print("testing the withdraw function")
+        test.insert_test(rib)
+        test.withdraw_test(rib)
+        test.insert_test(rib)
+        test.withdraw_test(rib)
+        test.reinsert_test(rib)
+        test.withdraw_test(rib)
+        test.insert_test(rib)
+        test.update_test(rib)
+        test.withdraw_test(rib)
+        test.reinsert_test(rib)
+        test.update_test(rib)
+        print(rib)
+        test.withdraw_all_test(rib)
+        print(rib)
+
+    def test3():
+        print("*** Test 3")
         print("loop testing the refresh function")
         for i in range(10):
             test.insert_test(rib)
@@ -131,6 +181,18 @@ def main(tc):
             test.insert_test(rib)
             test.refresh_test(rib)
             test.request_test(rib)
+        print(rib)
+
+    def test4():
+        print("*** Test 2")
+        print("testing the reinsert function")
+        test.insert_test(rib)
+        test.withdraw_test(rib)
+        print(rib)
+        test.reinsert_test(rib)
+        #test.update_test(rib)
+        #test.withdraw_test(rib)
+        #test.reinsert_test(rib)
         print(rib)
 
     def testx():
@@ -154,7 +216,10 @@ def main(tc):
     test=Test(tc)
     print("BGPribdb Unit tests")
     rib = BGPribdb.BGPribdb()
-    test2()
+    #test1()
+    #test2()
+    #test3()
+    test4()
     elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
     print("TC was %d, time was %f, time/TC=%fuS" % (tc,elapsed_time,elapsed_time/tc*1000000))

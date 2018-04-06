@@ -6,6 +6,7 @@
 
 import threading
 import pickle
+import sys
 
 class BGPribdb:
     def __init__(self):
@@ -15,6 +16,8 @@ class BGPribdb:
         self.update_requests = {}
         self.path_update_requests = {}
         self.path_update_requests[None] = []
+        self.all_prefixes_rcvd={}
+        self.all_prefixes_withdrawn={}
 
         # refresh_update_requests is a list whilst refresh operation is in progress
         # when it is an empty list then it is time to send end-of-RIB, after which it is set None
@@ -24,19 +27,21 @@ class BGPribdb:
 
 
         # calculate the global update state
-        pa_hashes_in_update = 0
+        pa_hashes_in_update_dict = {}
         prefixes_in_update = 0
         prefixes_in_withdraw = 0
         pa_hashes = {}
         for (pfx,pa_hash) in self.update_requests:
             if pa_hash:
                 prefixes_in_update += 1
+                pa_hashes_in_update_dict[pa_hash]=None
             else:
                 prefixes_in_withdraw += 1
             if not pa_hash in pa_hashes:
                 pa_hashes[pa_hash] = 1
             else:
                 pa_hashes[pa_hash] += 1
+        pa_hashes_in_update = len(pa_hashes_in_update_dict)
 
 
 
@@ -52,18 +57,26 @@ class BGPribdb:
             else:
                 path_prefixes_in_withdraw += len(pfxlist)
 
-        return "**BGPribdb state**" + \
-\
-               "\n  rib size =" + str(len(self.rib)) + \
-               "\n  paths in rib =" + str(len(self.path_attributes)) + \
-\
-               "\n  *global view* paths in update =" + str(pa_hashes_in_update) + \
-               "\n  *global view* prefixes in update =" + str(prefixes_in_update) + \
-               "\n  *global view* prefixes in withdraw =" + str(prefixes_in_withdraw) + \
-\
-               "\n  *path view* paths in update =" + str(path_pa_hashes_in_update) + \
-               "\n  *path view* prefixes in update =" + str(path_prefixes_in_update) + \
-               "\n  *path view* prefixes in withdraw =" + str(path_prefixes_in_withdraw)
+        # calculate the historic state
+        cnt_all_prefixes_rcvd = len(self.all_prefixes_rcvd)
+        cnt_all_unique_prefixes_rcvd = 0
+        for pfx in self.all_prefixes_rcvd:
+            cnt_all_unique_prefixes_rcvd += self.all_prefixes_rcvd[pfx]
+
+        cnt_all_prefixes_withdrawn = len(self.all_prefixes_withdrawn)
+        cnt_all_unique_prefixes_withdrawn = 0
+        for pfx in self.all_prefixes_withdrawn:
+            cnt_all_unique_prefixes_withdrawn += self.all_prefixes_withdrawn[pfx]
+
+
+        return \
+               "**BGPribdb state**\n" + \
+               "  rib size %d    " % len(self.rib) + \
+               "  paths in rib %d\n" % len(self.path_attributes) + \
+               "  *historic view* prefixes rcvd / unique prefixes rcvd = %d/%d\n" % ( cnt_all_prefixes_rcvd,cnt_all_unique_prefixes_rcvd) + \
+               "  *historic view* prefixes withd / unique prefixes withd = %d/%d\n" % ( cnt_all_prefixes_withdrawn,cnt_all_unique_prefixes_withdrawn) + \
+               "  *global view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (pa_hashes_in_update,prefixes_in_update,prefixes_in_withdraw) + \
+               "  *path view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (path_pa_hashes_in_update,path_prefixes_in_update,path_prefixes_in_withdraw)
 
     def lock(self):
         self.db_lock.acquire()
@@ -92,11 +105,22 @@ class BGPribdb:
         else:
             # it's not expected that a duplce insert occurs
             # it's not a problem and it does not call for an UPDATE to be sent
-            sys.stder.write("\n*** Unexpected duplicate inset for %s/%s\n" % (self.show_pfx(pfx),pa_hash))
+            sys.stderr.write("\n*** Unexpected duplicate inset for %s/%s\n" % (self.show_pfx(pfx),pa_hash))
             # pass
+        if pfx in self.all_prefixes_rcvd:
+            self.all_prefixes_rcvd[pfx] += 1
+        else:
+            self.all_prefixes_rcvd[pfx] = 1
+        ##sys.stderr.write("\n*** %X:%d \n" % (pfx[0],self.all_prefixes_rcvd[pfx]))
+
 
     def atomic_withdraw(self,pfx):
         self.atomic_update(pfx,None)
+        if pfx in self.all_prefixes_withdrawn:
+            self.all_prefixes_withdrawn[pfx] += 1
+        else:
+            self.all_prefixes_withdrawn[pfx] = 1
+
 
     def update(self,pa,pfx_list):
         self.lock()
