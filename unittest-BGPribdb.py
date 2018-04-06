@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-TC=10 # default seed count for testing
+RS=1000 # default RIB size for testing
 import random
 import BGPribdb
 import bgpparse
@@ -32,8 +32,8 @@ class Test():
         return ( random.randint(0,0xffffffff), random.randint(0,32))
 
     # refresh the whole RIB with updates
-    def refresh_test(self,rib):
-        print("******refresh test")
+    def populate_rib(self,rib):
+        print("******populate RIB with initial content")
         paths={}
         for prefix in self.test_prefixes.keys():
            path = self.test_prefixes[prefix] 
@@ -93,10 +93,29 @@ class Test():
         print("end_of_RIB %s" % end_of_RIB)
 
 
-def main(tc):
+def main(test_no,rs,rq_size):
 
-    def test1(rq_size,count):
-        print("*** Test 1 rq_size=%d count=%d")
+    def test0():
+        print("*** Test 0")
+        print("simplest test of all - create the RIB, inspect it")
+        test.populate_rib(rib)
+        print(rib)
+
+    def test1():
+        print("*** Test 1")
+        print("refresh request test - create the RIB, make a request with no updates, signal refresh, repaet the request")
+        test.populate_rib(rib)
+        print(rib)
+        test.update_request(rib)
+        print(rib)
+        test.refresh_request(rib)
+        print(rib)
+        test.update_request(rib)
+        print(rib)
+
+    def test2(rq_size,count):
+        print("*** Test 2 rq_size=%d count=%d" % (rq_size,count))
+        test.populate_rib(rib)
         print(rib)
         for c in range(count):
             test.update_test(rib,rq_size)
@@ -110,41 +129,62 @@ def main(tc):
         test.update_request(rib)
         print(rib)
 
-    def test2():
-        print("*** Test 2")
+    def test3(rq_size):
+        print("*** Test 2 %d" % rq_size)
         print("testing the withdraw function")
+        test.populate_rib(rib)
         print(rib)
-
-    def test3():
-        print("*** Test 3")
-        print("loop testing the refresh function")
+        test.withdraw_test(rib,rq_size)
         print(rib)
-
-    def test4():
-        print("*** Test 2")
-        print("testing the reinsert function")
-        print(rib)
-
-    def testx():
-        print("*** Test x")
+        test.update_request(rib)
         print(rib)
 
     start_time = time.perf_counter()
-    test=Test(tc,min(10,int(tc/20)))
+    test=Test(rs,max(10,int(rs/20)))
     print("BGPribdb Unit tests")
     rib = BGPribdb.BGPribdb()
-    test1(int(tc/10),10)
-    #test2()
+    if test_no == 0:
+        test0()
+    elif test_no == 1:
+        test1()
+    elif test_no == 2:
+        test2(rq_size,10)
+    elif test_no == 3:
+        test3(rq_size)
+    else:
+        sys.stderr.write("oops there is something wrong withthe test no requested")
+
+    #test0()
+    #test1()
+    #test2(rq_size,10)
+    #test3(rq_size)
     #test3()
-    #test4()
     elapsed_time = time.perf_counter()-start_time
     print("End BGPribdb Unit tests")
-    print("TC was %d, time was %f, time/TC=%fuS" % (tc,elapsed_time,elapsed_time/tc*1000000))
+    print("RS was %d, time was %f, time/RS=%fuS" % (rs,elapsed_time,elapsed_time/rs*1000000))
 
-tc = TC
 if len(sys.argv) > 1:
     try:
-        tc = int(sys.argv[1])
+        test_no = int(sys.argv[1])
     except:
-        tc = TC
-main(tc)
+        test_no = 0
+else:
+    test_no = 0
+
+if len(sys.argv) > 2:
+    try:
+        rs = int(sys.argv[2])
+    except:
+        rs = RS
+else:
+    rs = RS
+
+if len(sys.argv) > 3:
+    try:
+        rq_size = int(sys.argv[3])
+    except:
+        rq_size = min(10,int(rs/10))
+else:
+        rq_size = min(10,int(rs/10))
+
+main(test_no,rs,rq_size)
