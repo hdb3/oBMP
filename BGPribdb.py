@@ -30,6 +30,14 @@ class BGPribdb:
 
     def __str__(self):
 
+        cnt_refresh_paths=0
+        cnt_refresh_prefixes=0
+        if self.refresh_update_requests is None:
+            pass
+        else:
+            for (path,prefix_list) in self.refresh_update_requests.items():
+                cnt_refresh_paths += 1
+                cnt_refresh_prefixes += len(prefix_list)
 
         # calculate the global update state
         pa_hashes_in_update_dict = {}
@@ -76,6 +84,7 @@ class BGPribdb:
                "**BGPribdb state**\n" + \
                "  rib size %d    " % len(self.rib) + \
                "  paths in rib %d\n" % len(self.path_attributes) + \
+               "  *refresh queue * paths / prefixes = %d/%d\n" % ( cnt_refresh_paths,cnt_refresh_prefixes) + \
                "  *historic view* prefixes rcvd / unique prefixes rcvd = %d/%d\n" % ( cnt_all_prefixes_rcvd,cnt_all_unique_prefixes_rcvd) + \
                "  *historic view* prefixes withd / unique prefixes withd = %d/%d\n" % ( cnt_all_prefixes_withdrawn,cnt_all_unique_prefixes_withdrawn) + \
                "  *global view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (pa_hashes_in_update,prefixes_in_update,prefixes_in_withdraw) + \
