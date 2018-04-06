@@ -14,13 +14,17 @@ class Test():
     def __init__(self,pfx_count,path_count):
 
         self.test_prefixes={}
-        #self.test_prefixes_removed=[]
-        #self.test_prefixes_updated=[]
         self.test_paths=[]
         for i in range(path_count):
             self.test_paths.append(self.make_path())
         for i in range(pfx_count):
-            self.test_prefixes[self.make_prefix()] = random.choice(self.test_paths)
+            prefix = self.make_prefix()
+
+            # for large numbers random somtimes means duplicate!
+            # so check and discard....
+            while prefix in self.test_prefixes:
+                prefix = self.make_prefix()
+            self.test_prefixes[prefix] = random.choice(self.test_paths)
 
     def make_path(self):
         path = Object()
