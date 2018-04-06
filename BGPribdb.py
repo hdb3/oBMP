@@ -16,6 +16,10 @@ class BGPribdb:
         self.update_requests = {}
         self.path_update_requests = {}
         self.path_update_requests[None] = []
+
+        # the following are use counts over all received updates/withdraws
+        # counting the size of the dictionary provides the unique count
+        # summing each item give the total
         self.all_prefixes_rcvd={}
         self.all_prefixes_withdrawn={}
 
@@ -43,10 +47,8 @@ class BGPribdb:
                 pa_hashes[pa_hash] += 1
         pa_hashes_in_update = len(pa_hashes_in_update_dict)
 
-
-
-
         # calculate the per path update state
+        # this includes obseleted updates/withdraws
         path_pa_hashes_in_update = 0
         path_prefixes_in_update = 0
         path_prefixes_in_withdraw = 0
@@ -58,15 +60,15 @@ class BGPribdb:
                 path_prefixes_in_withdraw += len(pfxlist)
 
         # calculate the historic state
-        cnt_all_prefixes_rcvd = len(self.all_prefixes_rcvd)
-        cnt_all_unique_prefixes_rcvd = 0
+        cnt_all_unique_prefixes_rcvd = len(self.all_prefixes_rcvd)
+        cnt_all_prefixes_rcvd = 0
         for pfx in self.all_prefixes_rcvd:
-            cnt_all_unique_prefixes_rcvd += self.all_prefixes_rcvd[pfx]
+            cnt_all_prefixes_rcvd += self.all_prefixes_rcvd[pfx]
 
-        cnt_all_prefixes_withdrawn = len(self.all_prefixes_withdrawn)
-        cnt_all_unique_prefixes_withdrawn = 0
+        cnt_all_unique_prefixes_withdrawn = len(self.all_prefixes_withdrawn)
+        cnt_all_prefixes_withdrawn = 0
         for pfx in self.all_prefixes_withdrawn:
-            cnt_all_unique_prefixes_withdrawn += self.all_prefixes_withdrawn[pfx]
+            cnt_all_prefixes_withdrawn += self.all_prefixes_withdrawn[pfx]
 
 
         return \
@@ -103,16 +105,14 @@ class BGPribdb:
             self.path_update_requests[pa_hash].append(pfx)
             self.update_requests[pfx] = pa_hash
         else:
-            # it's not expected that a duplce insert occurs
-            # it's not a problem and it does not call for an UPDATE to be sent
-            sys.stderr.write("\n*** Unexpected duplicate inset for %s/%s\n" % (self.show_pfx(pfx),pa_hash))
+            # it's not expected that a duplicate insert occurs
+            # but it's not a problem and it does not call for an UPDATE to be sent
+            sys.stderr.write("\n*** Unexpected duplicate insert for %s/%s\n" % (self.show_pfx(pfx),pa_hash))
             # pass
         if pfx in self.all_prefixes_rcvd:
             self.all_prefixes_rcvd[pfx] += 1
         else:
             self.all_prefixes_rcvd[pfx] = 1
-        ##sys.stderr.write("\n*** %X:%d \n" % (pfx[0],self.all_prefixes_rcvd[pfx]))
-
 
     def atomic_withdraw(self,pfx):
         self.atomic_update(pfx,None)
@@ -120,7 +120,6 @@ class BGPribdb:
             self.all_prefixes_withdrawn[pfx] += 1
         else:
             self.all_prefixes_withdrawn[pfx] = 1
-
 
     def update(self,pa,pfx_list):
         self.lock()
