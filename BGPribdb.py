@@ -7,6 +7,7 @@
 import threading
 import pickle
 import sys
+import hashlib
 
 class BGPribdb:
     def __init__(self):
@@ -35,7 +36,7 @@ class BGPribdb:
         prefixes_in_update = 0
         prefixes_in_withdraw = 0
         pa_hashes = {}
-        for (pfx,pa_hash) in self.update_requests:
+        for (pfx,pa_hash) in self.update_requests.items():
             if pa_hash:
                 prefixes_in_update += 1
                 pa_hashes_in_update_dict[pa_hash]=None
@@ -95,9 +96,11 @@ class BGPribdb:
     @staticmethod
     def path_attribute_hash(pa):
         return hash(pickle.dumps(pa, protocol=pickle.HIGHEST_PROTOCOL))
+        ##return hashlib.blake2b(pickle.dumps(pa, protocol=pickle.HIGHEST_PROTOCOL)).digest()
 
     def atomic_update(self,pfx,pa_hash):
 
+        assert isinstance(pfx,tuple)
         # ALWAYS update the main RIB
         # UNLESS the RIB is unchanged schedule update sending
         if pa_hash not in self.rib or self.rib[pfx] != pa_hash:
@@ -124,12 +127,12 @@ class BGPribdb:
     def update(self,pa,pfx_list):
         self.lock()
         pa_hash = BGPribdb.path_attribute_hash(pa)
-        ##pa_hash = hash(pa)
         if pa_hash not in self.path_attributes:
             self.path_attributes[pa_hash] = pa
         if pa_hash not in self.path_update_requests:
             self.path_update_requests[pa_hash] = []
         for pfx in pfx_list:
+            assert isinstance(pfx,tuple)
             self.atomic_update(pfx,pa_hash)
         self.unlock()
 

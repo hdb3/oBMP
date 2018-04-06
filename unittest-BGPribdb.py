@@ -28,12 +28,13 @@ class Test():
 
     def make_path(self):
         path = Object()
-        path.a = random.randint(0,0xffffffff)
-        path.b = random.randint(0,0xffffffff)
+        path.a = random.randint(0xffff,0xffffffff)
+        path.b = random.randint(0xffff,0xffffffff)
+        path.h = hex(hash(path.a ^ path.b))
         return path
 
     def make_prefix(self):
-        return ( random.randint(0,0xffffffff), random.randint(0,32))
+        return ( random.randint(0,0xffffffff), random.randint(8,32))
 
     # refresh the whole RIB with updates
     def populate_rib(self,rib):
