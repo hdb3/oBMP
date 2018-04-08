@@ -16,28 +16,31 @@ def log(c):
     sys.stderr.write(c)
     sys.stderr.flush()
 
-class Session(threading.Thread):
+#class Session(threading.Thread):
+class Session():
 
-    def __init__(self,send,recv):
+    def __init__(self,name,send,recv):
+        self.name = name
         self.recv = recv
         self.send = send
         self.run()
 
     def run(self):
         i = 0
-        log("Session.run() starting")
-        while True:
-            self.send( bytes("Hello caller! (%d)" % i,"ascii"))
-            log("Session.run() waiting")
-            msg = self.recv()
-            if msg:
-                print("msg rcv: %s" % msg.hex())
+        log("Session.run(%s) starting\n" % self.name)
+        self.send( bytes("Hello caller from %s!" % self.name,"ascii"))
+        msg = self.recv()
+        while msg:
+            print("msg rcvd %s" % str(msg))
+            if b'bye' not in msg.lower() and i < 10:
+                self.send( bytes("Hello again from %s! (%d)" % (self.name,i),"ascii"))
+                sleep(1)
+                i += 1
             else:
-                test_msg = bytes("Hello world (%d)" % i,"ascii")
-            self.send( bytes("Hello world! (%d)" % i,"ascii"))
-            log("Session.run() sleeping")
-            sleep(5)
-            i += 1
+                self.send( bytes("Goodbye from from %s!" % self.name,"ascii"))
+                break
+            msg = self.recv()
+        log("Session.run(%s) exiting\n" % self.name)
 
 Initialising = 1
 Connecting = 2
@@ -102,7 +105,7 @@ class Collector(threading.Thread):
                         #self.event.clear()
                         #self.event.wait()
                         #self.event.clear()
-                        session = Session(self.send,self.recv)
+                        session = Session(self.name,self.send,self.recv)
                         ##session.run(self.send,self.recv)
 
                 else:
@@ -128,7 +131,7 @@ class Collector(threading.Thread):
                         #self.event.clear()
                         #self.event.wait()
                         #self.event.clear()
-                        session = Session(self.send,self.recv)
+                        session = Session(self.name,self.send,self.recv)
                         # session.run(self.send,self.recv)
 
 
