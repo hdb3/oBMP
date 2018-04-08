@@ -13,6 +13,9 @@ import socket
 import threading
 from time import sleep
 import pprint
+import bgpparse
+import bmpparse
+import BGPribdb
 
 def log(c):
     sys.stderr.write(c)
@@ -28,8 +31,38 @@ class Session():
             self.sink()
         elif 'source' in name.lower():
             self.source()
+        elif 'bmpd' in name.lower():
+            self.bmpd()
         else:
             self.run()
+
+    def bmpd(self):
+        rib = BGPribdb.BGPribdb()
+        i = 0
+        log("Session.bmpd(%s) starting\n" % self.name)
+        msg = self.recv()
+
+        while msg:
+            print("msg(%d) rcvd length %d" % (i,len(msg)))
+            bmpmsg = bmpparse.BMP_message(msg)
+            if bmpmsg.msg_type == bmpparse.BMP_Statistics_Report:
+                print("-- BMP stats report rcvd, length %d" % bmpmsg.length)
+                print(rib)
+            elif bmpmsg.msg_type == bmpparse.BMP_Route_Monitoring:
+                bgpmsg = bmpmsg.bmp_RM_bgp_message
+                parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
+                rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
+                if parsed_bgp_message.except_flag:
+                    forwarder.send(bgpmsg)
+                else:
+                    rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
+            else:
+                sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
+
+            i += 1
+            msg = self.recv()
+
+        log("Session.bmpd(%s) exiting\n" % self.name)
 
     def sink(self):
         i = 0
