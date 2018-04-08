@@ -1,0 +1,9 @@
+collector:
+    targets:
+            - host: dell0
+              port: 5002
+            - host: 192.168.0.77
+              port: 5002
+    listener:
+            host: *
+            port: 5002
