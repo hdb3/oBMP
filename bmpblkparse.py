@@ -6,6 +6,7 @@
 import struct
 import sys
 def eprint(s):
+    return
     sys.stderr.write(s+'\n')
     sys.stderr.flush()
 
@@ -34,10 +35,10 @@ class BMP_unblocker:
             version  = struct.unpack_from('!B', msg, offset=offset)[0]
             length   = struct.unpack_from('!I', msg, offset=offset+1)[0]
             msg_type = struct.unpack_from('!B', msg, offset=offset+5)[0]
-            assert 3 == version, "failed version check, expected 3 got %0X" % version
-            assert msg_type < 7, "failed message type check, expected < 7, got %0X" % msg_type
+            assert 3 == version, "failed version check, expected 3 got %x offset %d+%d" % (version,self.bytes_processed,offset)
+            assert msg_type < 7, "failed message type check, expected < 7, got %x" % msg_type
     
-            #eprint("BMP_unblocker: processing sub-block %d in block %d BMP msg type %d BMP msg length %d offset %d" % (sub_block,self.blocks_processed,msg_type,length,offset))
+            eprint("BMP_unblocker: processing sub-block %d in block %d BMP msg type %d BMP msg length %d offset %d" % (sub_block,self.blocks_processed,msg_type,length,offset))
     
             if msg_len >= length + offset:
                 if self.parse:
