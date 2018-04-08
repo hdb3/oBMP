@@ -30,7 +30,7 @@ class UnitTest():
         self.name = "bmpd unit-test"
 
     def recv(self):
-        return self.f.read(4096)
+        return self.f.read(self.count)
 
     def bmpd(self):
         rib = BGPribdb.BGPribdb()
@@ -38,7 +38,8 @@ class UnitTest():
         i = 0
         log("Session.bmpd(%s) starting\n" % self.name)
 
-        while i < self.count:
+        while True:
+        #while i < self.count:
             msg = self.recv()
             i += 1
             print("msg(%d) rcvd length %d" % (i,len(msg)))
