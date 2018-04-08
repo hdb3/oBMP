@@ -40,7 +40,7 @@ class BMP_message:
             pass # there is no PPC header in these messages
         else:
             assert msg_len > 47
-            self.bmp_ppc_fixed_hash = hash(msg[6:40])
+            self.bmp_ppc_fixed_hash = hash(str(msg[6:40]))
             self.bmp_ppc_Peer_Type = struct.unpack_from('!B', msg, offset=6)[0]               # 1 byte index 6
             self.bmp_ppc_Peer_Flags = struct.unpack_from('!B', msg, offset=7)[0]              # 1 byte index 7
             self.bmp_ppc_Peer_Distinguisher  = struct.unpack_from('!Q', msg, offset=8)[0]     # 8 bytes index 8
