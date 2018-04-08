@@ -12,23 +12,30 @@ import threading
 from time import sleep
 import pprint
 
+def log(c):
+    sys.stderr.write(c)
+    sys.stderr.flush()
+
 class Session(threading.Thread):
 
-    def __init__(send,recv):
+    def __init__(self,send,recv):
         self.recv = recv
         self.send = send
         self.run()
 
     def run(self):
         i = 0
+        log("Session.run() starting")
         while True:
             self.send( bytes("Hello caller! (%d)" % i,"ascii"))
+            log("Session.run() waiting")
             msg = self.recv()
             if msg:
-                print("msg rcv: %s" % hex(msg))
+                print("msg rcv: %s" % msg.hex())
             else:
                 test_msg = bytes("Hello world (%d)" % i,"ascii")
             self.send( bytes("Hello world! (%d)" % i,"ascii"))
+            log("Session.run() sleeping")
             sleep(5)
             i += 1
 
@@ -39,10 +46,7 @@ Error = 4
 Retrying = 5
 Connected = 6
 Disconnected = 7
-
-def log(c):
-    sys.stderr.write(c)
-    sys.stderr.flush()
+BUFSIZ=4096
 
 class Collector(threading.Thread):
 
@@ -95,11 +99,11 @@ class Collector(threading.Thread):
                         self.state = Connected
                         self.connections += 1
                         self.log_err("connected to %s\n" % self.address_name)
-                        self.event.clear()
-                        self.event.wait()
-                        self.event.clear()
-                        session = Session()
-                        session.run(self.send,self.recv)
+                        #self.event.clear()
+                        #self.event.wait()
+                        #self.event.clear()
+                        session = Session(self.send,self.recv)
+                        ##session.run(self.send,self.recv)
 
                 else:
                     try:
@@ -121,11 +125,11 @@ class Collector(threading.Thread):
                         self.state = Connected
                         self.connections += 1
                         self.log_err("connected to %s\n" % self.address_name)
-                        self.event.clear()
-                        self.event.wait()
-                        self.event.clear()
-                        session = Session()
-                        session.run(self.send,self.recv)
+                        #self.event.clear()
+                        #self.event.wait()
+                        #self.event.clear()
+                        session = Session(self.send,self.recv)
+                        # session.run(self.send,self.recv)
 
 
     def recv(self):
