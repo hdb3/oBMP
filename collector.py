@@ -5,7 +5,9 @@
 # this is a generic TCP active sender
 #
 import os.path
+import errno
 import yaml
+import traceback
 import sys
 import socket
 import threading
@@ -16,14 +18,43 @@ def log(c):
     sys.stderr.write(c)
     sys.stderr.flush()
 
-#class Session(threading.Thread):
 class Session():
 
     def __init__(self,name,send,recv):
         self.name = name
         self.recv = recv
         self.send = send
-        self.run()
+        if 'sink' in name.lower():
+            self.sink()
+        elif 'source' in name.lower():
+            self.source()
+        else:
+            self.run()
+
+    def sink(self):
+        i = 0
+        log("Session.sink(%s) starting\n" % self.name)
+        msg = self.recv()
+
+        while msg:
+            print("msg(%d) rcvd length %d" % (i,len(msg)))
+            i += 1
+            msg = self.recv()
+
+        log("Session.sink(%s) exiting\n" % self.name)
+
+    def source(self):
+        i = 0
+        log("Session.source(%s) starting\n" % self.name)
+        status = self.send( bytes("Hello caller from %s!" % self.name,"ascii"))
+
+        while status:
+            print("msg sent %d" % i)
+            status = self.send( bytes("Hello again from %s! (%d)" % (self.name,i),"ascii"))
+            i += 1
+            sleep(5)
+
+        log("Session.source(%s) exiting\n" % self.name)
 
     def run(self):
         i = 0
@@ -51,6 +82,10 @@ Connected = 6
 Disconnected = 7
 BUFSIZ=4096
 
+def _name(address):
+    assert isinstance(address,tuple)
+    return "%s:%d" % address
+
 class Collector(threading.Thread):
 
     def __init__(self,name,host,port,passive=False):
@@ -62,56 +97,98 @@ class Collector(threading.Thread):
         self.connections = 0
         self.event = threading.Event()
         self.address = (host,port)
-        self.address_name = "%s:%d" % (host,port)
         self.log_err = lambda s : log("%s: %s\n" % (self.name,s))
 
     def run(self):
         self.state = Connecting
         if self.passive:
-            try:
-                if self.connections == 0:
-                    self.log_err("awaiting connection on %s\n" % self.address_name)
-                else:
-                    self.log_err("reawaiting connection on %s\n" % self.address_name)
-                listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                listen_socket.bind(self.address)
-                listen_socket.listen(1)
-                while True:
-                    self.sock,self.address = listen_socket.accept()
+            self.log_err("awaiting connection on %s\n" % _name(self.address))
+            self.listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            for i in range(100):
+                try:
+                    self.state = Error
+                    self.listen_sock.bind(self.address)
+                    self.state = Connecting
+                    if i > 0:
+                        self.log_err("bind success!")
+                    break
+                except OSError as e:
+                    if e.errno != errno.EADDRINUSE:
+                        raise
+                    else:
+                        if i == 0:
+                            self.log_err("bind - address in use - will wait and try again")
+                        else:
+                            log("~")
+                        sleep(3)
+                except (socket.herror,socket.gaierror) as e:
+                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
+                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    self.state = Error
+                except Exception as e:
+                    self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
+                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    self.state = Error
+
+            if self.state == Error:
+                self.log_err("bind - address in use - giving up")
+                exit()
+
+            self.listen_sock.listen(1)
+
+            while self.state != Error:
+                try:
+                    self.sock,remote_address = self.listen_sock.accept()
+                    self.sock.setblocking(True)
                     self.state = Connected
                     self.connections += 1
-                    self.log_err("connected to %s\n" % self.address_name)
+                    self.log_err("connected to %s\n" % _name(remote_address))
                     session = Session(self.name,self.send,self.recv)
-            except (socket.herror,socket.gaierror) as e:
-                self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % self.address_name)
-                self.state = Error
-            except Exception as e:
-                self.log_err("unknown error %s" % e + " connecting to %s\n" % self.address_name)
-                self.state = Error
+                    try:
+                        self.sock.shutdown(socket.SHUT_RDWR)
+                        self.sock.close()
+                    except Exception as e:
+                        self.log_err("ignored exception closing listen socket: %s\n" % str(e))
+                        traceback.print_tb( sys.exc_info()[2],limit=3)
+                except (socket.herror,socket.gaierror) as e:
+                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
+                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    self.state = Error
+                    break
+                except Exception as e:
+                    self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
+                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    self.state = Error
+                    sleep(10)
+                    self.log_err("reawaiting connection on %s\n" % _name(self.address))
+                    continue
 
         else:
             while True:
                 try:
                     if self.connections == 0:
-                        self.log_err("attempting connection to %s\n" % self.address_name)
+                        self.log_err("attempting connection to %s\n" % _name(self.address))
                     else:
-                        self.log_err("reattempting connection to %s\n" % self.address_name)
+                        self.log_err("reattempting connection to %s\n" % _name(self.address))
                     self.sock = socket.create_connection(self.address,1)
+                    self.sock.setblocking(True)
                     self.state = Connected
                     self.connections += 1
-                    self.log_err("connected to %s\n" % self.address_name)
+                    self.log_err("connected to %s\n" % _name(self.address))
                     session = Session(self.name,self.send,self.recv)
+                    self.sock.close()
+                    self.sock.shutdown(socket.SHUT_RDWR)
                 except (socket.error,socket.timeout) as e:
                     self.last_socket_error = e
                     self.state = Retrying
                     sleep(1)
                     continue
                 except (socket.herror,socket.gaierror) as e:
-                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % self.address_name)
+                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
                     self.state = Error
                     break
                 except Exception as e:
-                    self.log_err("unknown error %s" % e + " connecting to %s\n" % self.address_name)
+                    self.log_err("unknown error %s" % e + " connecting to %s\n" % _name(self.address))
                     self.state = Error
                     break
 
@@ -130,10 +207,17 @@ class Collector(threading.Thread):
                     fullmsg += msg
                 return fullmsg
 
+            except socket.timeout:
+                self.sock.close()
+                self.sock.shutdown(socket.SHUT_RDWR)
+                self.log_err("\nwaited too long on recv %s\n")
+                self.state = Disconnected
+                return
             except socket.error as errmsg:
                 if self.is_alive():
                     self.state = Disconnected
                     log('!')
+                    self.log_err("\nunexpected error on recv %s\n" % errmsg)
                     self.event.set()
                     return
                 else:
@@ -165,6 +249,7 @@ class Collector(threading.Thread):
                     self.state = Error
                     sys.exit()
             log('S')
+            return True
 
 def main(name,config):
 
