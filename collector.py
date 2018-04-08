@@ -16,6 +16,7 @@ import pprint
 import bgpparse
 import bmpparse
 import BGPribdb
+import bmpblkparse
 
 def log(c):
     sys.stderr.write(c)
@@ -38,29 +39,47 @@ class Session():
 
     def bmpd(self):
         rib = BGPribdb.BGPribdb()
+        blkparser = bmpblkparse.BMP_unblocker(parse=False)
         i = 0
         log("Session.bmpd(%s) starting\n" % self.name)
-        msg = self.recv()
 
-        while msg:
-            print("msg(%d) rcvd length %d" % (i,len(msg)))
-            bmpmsg = bmpparse.BMP_message(msg)
-            if bmpmsg.msg_type == bmpparse.BMP_Statistics_Report:
-                print("-- BMP stats report rcvd, length %d" % bmpmsg.length)
-                print(rib)
-            elif bmpmsg.msg_type == bmpparse.BMP_Route_Monitoring:
-                bgpmsg = bmpmsg.bmp_RM_bgp_message
-                parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
-                rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
-                if parsed_bgp_message.except_flag:
-                    forwarder.send(bgpmsg)
-                else:
-                    rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
-            else:
-                sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
-
-            i += 1
+        while True:
             msg = self.recv()
+            if msg is None:
+                print("null message")
+                sleep(10)
+                continue
+            if len(msg) == 0:
+                print("empty message")
+                sleep(10)
+                continue
+            i += 1
+            print("msg(%d) rcvd length %d" % (i,len(msg)))
+            bmpmsgs = blkparser.push(msg)
+            print("BMP block parser returned %d BMP messages" % len(bmpmsgs))
+            #bmpmsg = bmpparse.BMP_message(msg)
+            for bmpmsg in bmpmsgs:
+                msg_type = blkparser.bmp_message_type(bmpmsg)
+                msg_length = len(bmpmsg)
+                if msg_type == bmpparse.BMP_Initiation_Message:
+                    print("-- BMP Initiation Message rcvd, length %d" % msg_length)
+                elif msg_type == bmpparse.BMP_Peer_Up_Notification:
+                    print("-- BMP Peer Up rcvd, length %d" % msg_length)
+                elif msg_type == bmpparse.BMP_Statistics_Report:
+                    print("-- BMP stats report rcvd, length %d" % msg_length)
+                    ##print(rib)
+                elif msg_type == bmpparse.BMP_Route_Monitoring:
+                    print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
+                    #bgpmsg = bmpmsg.bmp_RM_bgp_message
+                    #parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
+                    ##rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
+                    ##if parsed_bgp_message.except_flag:
+                        ##forwarder.send(bgpmsg)
+                    ##else:
+                        ##rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
+                else:
+                    sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
+
 
         log("Session.bmpd(%s) exiting\n" % self.name)
 
@@ -156,11 +175,11 @@ class Collector(threading.Thread):
                         sleep(3)
                 except (socket.herror,socket.gaierror) as e:
                     self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
-                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
                     self.state = Error
                 except Exception as e:
                     self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
-                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
                     self.state = Error
 
             if self.state == Error:
@@ -182,15 +201,15 @@ class Collector(threading.Thread):
                         self.sock.close()
                     except Exception as e:
                         self.log_err("ignored exception closing listen socket: %s\n" % str(e))
-                        traceback.print_tb( sys.exc_info()[2],limit=3)
+                        traceback.print_tb( sys.exc_info()[2],limit=9)
                 except (socket.herror,socket.gaierror) as e:
                     self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
-                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
                     self.state = Error
                     break
                 except Exception as e:
                     self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
-                    traceback.print_tb( sys.exc_info()[2],limit=3)
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
                     self.state = Error
                     sleep(10)
                     self.log_err("reawaiting connection on %s\n" % _name(self.address))
@@ -218,10 +237,12 @@ class Collector(threading.Thread):
                     continue
                 except (socket.herror,socket.gaierror) as e:
                     self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
                     self.state = Error
                     break
                 except Exception as e:
                     self.log_err("unknown error %s" % e + " connecting to %s\n" % _name(self.address))
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
                     self.state = Error
                     break
 
@@ -259,6 +280,7 @@ class Collector(threading.Thread):
                     sys.exit()
             except Exception as e:
                 self.log_err("\nunknown error on recv %s\n" % e)
+                traceback.print_tb( sys.exc_info()[2],limit=9)
                 self.state = Error
                 return None
 
