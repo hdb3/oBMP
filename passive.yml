@@ -1,0 +1,7 @@
+# 
+# passive.yml
+# wait for an inbound session
+collector:
+    listener:
+            host: '*'
+            port: 5002
