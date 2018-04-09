@@ -46,25 +46,22 @@ class BmpBlkParser():
             print("-- BMP Peer Up rcvd, length %d" % msg_length)
         elif bmpmsg.msg_type == bmpparse.BMP_Statistics_Report:
             print("-- BMP stats report rcvd, length %d" % msg_length)
-            ##print(rib)
         elif bmpmsg.msg_type == bmpparse.BMP_Route_Monitoring:
-            ## print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
+            #print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
             parsed_bgp_message = bgpparse.BGP_message(bmpmsg.bmp_RM_bgp_message)
             self.rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
             if parsed_bgp_message.except_flag:
-                ##forwarder.send(bgpmsg)
-                print("except during parsing at message no %d" % n)
+                eprint("except during parsing at message no %d" % n)
             else:
                 self.rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
         else:
-            sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
+            eprint("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
 
     
     def get_bmp_message(self):
 
         bytes_available = self.bytes_available()
         if bytes_available < 6:
-            eprint("header not available")
             return bytearray()
 
         hdr = self.peek(6)
@@ -75,7 +72,6 @@ class BmpBlkParser():
         assert msg_type < 7, "failed message type check, expected < 7, got %x" % msg_type
 
         if bytes_available < length:
-            eprint("message not available")
             return bytearray()
         else:
             return self.get(length)
@@ -99,7 +95,6 @@ n=0
 parser = BmpBlkParser()
 with open(filename,'rb') as f:
     eof = False
-    msg = parser.get_bmp_message()
     while not eof:
         msg = parser.get_bmp_message()
         while msg:
@@ -113,5 +108,5 @@ with open(filename,'rb') as f:
         else:
             parser.push(fb)
 
-eprint("%d messages processed" % n)
-eprint(parser.rib)
+print("%d messages processed" % n)
+print(parser.rib)
