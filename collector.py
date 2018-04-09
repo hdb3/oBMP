@@ -55,7 +55,8 @@ class Session():
                 continue
             i += 1
             print("msg(%d) rcvd length %d" % (i,len(msg)))
-            bmpmsgs = blkparser.push(msg)
+            blkparser.push(msg)
+            bmpmsgs = blkparser.pull()
             print("BMP block parser returned %d BMP messages" % len(bmpmsgs))
             #bmpmsg = bmpparse.BMP_message(msg)
             for bmpmsg in bmpmsgs:
