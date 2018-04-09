@@ -41,6 +41,8 @@ class UnitTest():
         while True:
         #while i < self.count:
             msg = self.recv()
+            if 0 == len(msg):
+                break
             i += 1
             print("msg(%d) rcvd length %d" % (i,len(msg)))
             bmpmsgs = blkparser.push(msg)
@@ -75,6 +77,6 @@ f = open(sys.argv[1],'rb')
 if len(sys.argv) > 2:
     c = int(sys.argv[2])
 else:
-    c = 0xffffff
+    c = 4096
 run=UnitTest(f,c)
 run.bmpd()
