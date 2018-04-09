@@ -36,6 +36,7 @@ BGP_TYPE_CODE_MP_UNREACH_NLRI = 15
 BGP_TYPE_CODE_EXTENDED_COMMUNITIES = 16
 BGP_TYPE_CODE_AS4_PATH = 17
 BGP_TYPE_CODE_AS4_AGGREGATOR = 18
+BGP_TYPE_CODE_CONNECTOR = 20
 BGP_TYPE_CODE_AS_PATHLIMIT = 21
 BGP_TYPE_CODE_LARGE_COMMUNITY = 32
 BGP_TYPE_CODE_ATTR_SET = 128
@@ -233,6 +234,13 @@ class BGP_message:
             self.attribute[code] = (struct.unpack_from('!B', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=1)[0])
             eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.attribute[code]))
 
+    def parse_attribute_connector(self,code,attr):
+        # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
+
+            assert len(attr) >4
+            self.attribute[code] = attr
+            eprint("parse_attribute_connector: value %s" % attr.hex())
+
 
     def parse_attribute_AS_path(self,code,attr,as4=False):
 
@@ -391,6 +399,9 @@ class BGP_message:
 
         elif (code==BGP_TYPE_CODE_AS_PATHLIMIT):
             self.parse_attribute_as_pathlimit(code,attr)
+
+        elif (code==BGP_TYPE_CODE_CONNECTOR):
+            self.parse_attribute_connector(code,attr)
 
         else:
             assert False , "Unknown BGP path attribute type %d" % code
