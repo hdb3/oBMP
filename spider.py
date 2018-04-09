@@ -93,7 +93,7 @@ for bmpmsg in msgs:
         print("-- BMP stats report rcvd, length %d" % msg_length)
         ##print(rib)
     elif msg_type == bmpparse.BMP_Route_Monitoring:
-        print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
+        ## print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
         bgpmsg = bmpmsg.bmp_RM_bgp_message
         parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
         ##rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
