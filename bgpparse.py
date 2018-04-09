@@ -36,6 +36,7 @@ BGP_TYPE_CODE_MP_UNREACH_NLRI = 15
 BGP_TYPE_CODE_EXTENDED_COMMUNITIES = 16
 BGP_TYPE_CODE_AS4_PATH = 17
 BGP_TYPE_CODE_AS4_AGGREGATOR = 18
+BGP_TYPE_CODE_AS_PATHLIMIT = 21
 BGP_TYPE_CODE_LARGE_COMMUNITY = 32
 BGP_TYPE_CODE_ATTR_SET = 128
 BGP_Attribute_Flags_Optional = 0x80 # 1 << 7
@@ -186,7 +187,7 @@ class BGP_message:
             assert len(self.prefixes) == 0, "check for processing NLRI before attributes failed"
         
 
-    def parse_attribute_communities(self,attr,code):
+    def parse_attribute_communities(self,code,attr):
 
         assert 0 == len(attr) % 4, "BGP community string length not multiple of 4 (%d)" % len(attr)
 
@@ -198,13 +199,13 @@ class BGP_message:
 
         self.attribute[code] = community_list
 
-    def parse_attribute_attribute_set(self,attr,code):
+    def parse_attribute_attribute_set(self,code,attr):
 
         assert 4 < len(attr), "BGP  attribute set length less than 4 (%d)" % len(attr)
 
         self.attribute[code] = ((struct.unpack_from('!I', attr, offset=0)[0],attr[4:]))
 
-    def parse_attribute_extended_communities(self,attr,code):
+    def parse_attribute_extended_communities(self,code,attr):
 
         assert 0 == len(attr) % 8, "BGP extended community string length not multiple of 8 (%d)" % len(attr)
 
@@ -215,7 +216,7 @@ class BGP_message:
 
         self.attribute[code] = extended_community_list
 
-    def parse_attribute_large_community(self,attr,code):
+    def parse_attribute_large_community(self,code,attr):
 
         assert 0 == len(attr) % 12, "BGP large community string length not multiple of 12 (%d)" % len(attr)
 
@@ -226,6 +227,11 @@ class BGP_message:
             offset += 12
 
         self.attribute[code] = community_list
+
+    def parse_attribute_as_pathlimit(self,code,attr):
+            assert len(attr) == 5
+            self.attribute[code] = (struct.unpack_from('!B', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=1)[0])
+            eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.attribute[code]))
 
 
     def parse_attribute_AS_path(self,code,attr,as4=False):
@@ -363,10 +369,10 @@ class BGP_message:
             self.parse_attribute_aggregator(code,attr)
 
         elif (code==BGP_TYPE_CODE_COMMUNITIES):
-            self.parse_attribute_communities(attr,code)
+            self.parse_attribute_communities(code,attr)
 
         elif (code==BGP_TYPE_CODE_EXTENDED_COMMUNITIES):
-            self.parse_attribute_extended_communities(attr,code)
+            self.parse_attribute_extended_communities(code,attr)
 
         elif (code==BGP_TYPE_CODE_AS4_PATH):
             self.parse_attribute_AS_path(code,attr,as4=True)
@@ -378,10 +384,13 @@ class BGP_message:
             self.parse_attribute_unhandled(code,attr)
 
         elif (code==BGP_TYPE_CODE_LARGE_COMMUNITY):
-            self.parse_attribute_large_community(attr,code)
+            self.parse_attribute_large_community(code,attr)
 
         elif (code==BGP_TYPE_CODE_ATTR_SET):
-            self.parse_attribute_attribute_set(attr,code)
+            self.parse_attribute_attribute_set(code,attr)
+
+        elif (code==BGP_TYPE_CODE_AS_PATHLIMIT):
+            self.parse_attribute_as_pathlimit(code,attr)
 
         else:
             assert False , "Unknown BGP path attribute type %d" % code
