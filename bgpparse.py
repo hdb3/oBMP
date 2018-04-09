@@ -12,6 +12,7 @@ import traceback
 
 def eprint(s):
     sys.stderr.write(s+'\n')
+    sys.stderr.flush()
 
 BGP_marker = struct.pack('!QQ',0xffffffffffffffff,0xffffffffffffffff)
 BGP_OPEN = 1
@@ -209,7 +210,7 @@ class BGP_message:
         self.attribute[code] = community_list
 
 
-    def parse_attribute_AS_path(self,attr,as4=False):
+    def parse_attribute_AS_path(self,code,attr,as4=False):
 
     # an AS path attribute has 1 or more AS segments
     # each segment is represented by 1 byte segment type + 1 byte segment length + variable number of AS
@@ -244,51 +245,57 @@ class BGP_message:
             return struct.unpack_from('!I', msg, offset=pos)[0]
     
         def get_segment(msg,as4):
+            eprint("get_segment: %s" % msg.hex())
     
             if as4:
-                get_asn_at = getq_at
+                get_asn_at = getl_at
                 asn_len = 4
                 asn_shift = lambda n : n << 2
             else:
-                get_asn_at = getl_at
+                get_asn_at = getw_at
                 asn_len = 2
                 asn_shift = lambda n : n << 1
     
             assert len(msg) >= 4
     
             segment_type = getb_at(msg,0)
-            assert path_segment_type == 1 or path_segment_type == 2
+            assert segment_type == 1 or segment_type == 2
     
             segment_length = getb_at(msg,1)
             assert len(msg) >= 2 + asn_shift(segment_length)
     
             as_list = []
-            offset = 0
-            for i in range(segment_length):
+            for offset in range(0,segment_length,asn_len):
                 as_list.append(get_asn_at(msg, offset))
-                offset += asn_len
     
-            return (path_segment_type,as_list,msg[2 + asn_shift(segment_length)])
+            return (segment_type,as_list,msg[2 + asn_shift(segment_length):])
     
         def get_segments(msg,as4):
+            eprint("get_segments: %s" % msg.hex())
             segments=[]
             while msg:
-                path_segment_type,as_list,msg = get_segment(msg,as4)
-                segments.append(path_segment_type,as_list)
+                segment_type,as_list,msg = get_segment(msg,as4)
+                segments.append((segment_type,as_list))
+            return segments
     
+        eprint("parse_attribute_AS_path: %s" % attr.hex())
         segments = []
         try:
-            segments = get_segments(msg,True)
+            segments = get_segments(attr,True)
             eprint("read AS path as AS4")
-        except:
+        except AssertionError as ae:
+            eprint("parse_attribute_AS_path: assert error %s" % ae)
+            traceback.print_tb( sys.exc_info()[2])
             try:
                 segments = get_segments(msg,False)
                 eprint("read AS path as AS2")
-            except:
+            except AssertionError as ae:
+                eprint("parse_attribute_AS_path: assert error %s" % ae)
+                traceback.print_tb( sys.exc_info()[2])
                 eprint("could not read AS path as AS2 or AS4")
     
         if segments:
-            self.attribute[code] = segment_list
+            self.attribute[code] = segments
 
     def parse_attribute_4b_4b(self,code,attr):
             assert len(attr) == 8
@@ -320,7 +327,7 @@ class BGP_message:
             self.parse_attribute_8bits(code,attr)
 
         elif (code==BGP_TYPE_CODE_AS_PATH):
-            self.parse_attribute_AS_path(attr)
+            self.parse_attribute_AS_path(code,attr)
 
         elif (code==BGP_TYPE_CODE_NEXT_HOP):
             self.parse_attribute_32bits(code,attr)
@@ -341,7 +348,7 @@ class BGP_message:
             self.parse_attribute_communities(attr,code)
 
         elif (code==BGP_TYPE_CODE_AS4_PATH):
-            self.parse_attribute_AS_path(attr,as4=True)
+            self.parse_attribute_AS_path(code,attr,as4=True)
 
         elif (code==BGP_TYPE_CODE_AS4_AGGREGATOR):
             self.parse_attribute_4b_4b(code,attr)
