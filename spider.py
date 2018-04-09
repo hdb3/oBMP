@@ -27,7 +27,7 @@ class Spider():
             self.max_rq_size = size
         while size > len(self.file_buffer):
             more_data = self.f.read(self.bufsiz)
-            self.file_buffer += more_data
+            self.file_buffer.extend(more_data)
             if len(more_data) < self.bufsiz:
                 self.eof = True
                 break
@@ -66,12 +66,22 @@ class Spider():
     
         return bmp_msgs
 
+if len(sys.argv) > 1:
+    filename = sys.argv[1]
+else:
+    filename = 'dump.bmp'
+
+if len(sys.argv) > 2:
+    bufsiz = int(sys.argv[2])
+else:
+    bufsiz = 4096
+
 if len(sys.argv) > 3:
     limit = int(sys.argv[3])
 else:
     limit = 0xffffff
 
-spider = Spider(sys.argv[1],int(sys.argv[2]))
+spider = Spider(filename,bufsiz)
 msgs = spider.parse()
 eprint("read %d msgs" % len(msgs))
 mxl = 0
@@ -96,17 +106,19 @@ for bmpmsg in msgs:
         ## print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
         bgpmsg = bmpmsg.bmp_RM_bgp_message
         parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
-        ##rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
-        ##if parsed_bgp_message.except_flag:
+        rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
+        if parsed_bgp_message.except_flag:
             ##forwarder.send(bgpmsg)
-        ##else:
-            ##rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
+            print("except during parsing at message no %d" % n)
+        else:
+            rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
     else:
         sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
     n += 1
     if n > limit:
         exit()
 
+eprint("%d messages processed" % n)
 eprint("max length message was %d" % mxl)
 eprint("min length message was %d" % mnl)
 eprint("max rq size was %d" % spider.max_rq_size)
