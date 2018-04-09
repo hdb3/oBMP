@@ -17,21 +17,34 @@ def eprint(s):
 
 class BmpBlkParser():
 
-    def __init__(self):
+    def __init__(self,getter):
         self.file_buffer = bytearray()
         self.rib = BGPribdb.BGPribdb()
+        self.getter = getter
+        self.file_buffer.extend(getter())
 
     def bytes_available(self):
-        return len(self.file_buffer)
+        return 0xffff
+        ##return len(self.file_buffer)
 
     def peek(self,length):
+        while length > len(self.file_buffer):
+            msg = self.getter()
+            self.file_buffer.extend(msg)
         return self.file_buffer[:length]
 
     def push(self,msg):
         self.file_buffer.extend(msg)
 
     def get(self,size):
-        assert size <= len(self.file_buffer), "should never happen if the requestor uses bytes_available() before making the request"
+        #eprint("get")
+        while size > len(self.file_buffer):
+            #eprint("get more")
+            msg = self.getter()
+            if 0 == len(msg):
+                break
+            else:
+                self.file_buffer.extend(msg)
         rbuff = self.file_buffer[:size]
         self.file_buffer = self.file_buffer[size:]
         return rbuff
@@ -59,22 +72,20 @@ class BmpBlkParser():
 
     
     def get_bmp_message(self):
-
-        bytes_available = self.bytes_available()
-        if bytes_available < 6:
+        #eprint("get_bmp_message")
+        hdr = self.get(6)
+        if len(hdr) < 6:
             return bytearray()
-
-        hdr = self.peek(6)
         version  = struct.unpack_from('!B', hdr, offset=0)[0]
         length   = struct.unpack_from('!I', hdr, offset=1)[0]
         msg_type = struct.unpack_from('!B', hdr, offset=5)[0]
         assert 3 == version, "failed version check, expected 3 got %x offset %d+%d" % (version,self.bytes_processed,offset)
         assert msg_type < 7, "failed message type check, expected < 7, got %x" % msg_type
-
-        if bytes_available < length:
+        payload = self.get(length-6)
+        if len(payload) < length-6:
             return bytearray()
-        else:
-            return self.get(length)
+        hdr.extend(payload)
+        return hdr
 
 if len(sys.argv) > 1:
     filename = sys.argv[1]
@@ -92,21 +103,13 @@ else:
     limit = 0xffffff
 
 n=0
-parser = BmpBlkParser()
 with open(filename,'rb') as f:
-    eof = False
-    while not eof:
+    parser = BmpBlkParser(lambda : f.read(4096))
+    msg = parser.get_bmp_message()
+    while msg:
+        n += 1
+        parser.parse(msg)
         msg = parser.get_bmp_message()
-        while msg:
-            n += 1
-            parser.parse(msg)
-            msg = parser.get_bmp_message()
-        fb = f.read(bufsiz)
-        eof = (0 == len(fb))
-        if eof:
-            break
-        else:
-            parser.push(fb)
 
 print("%d messages processed" % n)
 print(parser.rib)
