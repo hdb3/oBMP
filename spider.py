@@ -66,6 +66,11 @@ class Spider():
     
         return bmp_msgs
 
+if len(sys.argv) > 3:
+    limit = int(sys.argv[3])
+else:
+    limit = 0xffffff
+
 spider = Spider(sys.argv[1],int(sys.argv[2]))
 msgs = spider.parse()
 eprint("read %d msgs" % len(msgs))
@@ -74,6 +79,7 @@ mnl = 4096
 
 rib = BGPribdb.BGPribdb()
 
+n=0
 for bmpmsg in msgs:
     mxl = max(mxl,bmpmsg.length)
     mnl = min(mxl,bmpmsg.length)
@@ -97,6 +103,9 @@ for bmpmsg in msgs:
             ##rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
     else:
         sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
+    n += 1
+    if n > limit:
+        exit()
 
 eprint("max length message was %d" % mxl)
 eprint("min length message was %d" % mnl)
