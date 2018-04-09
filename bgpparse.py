@@ -7,7 +7,9 @@ import struct
 import sys
 from binascii import hexlify
 from ipaddress import ip_address
-from pprint import pformat
+#from pprint import pformat
+import traceback
+
 def eprint(s):
     sys.stderr.write(s+'\n')
 
@@ -162,6 +164,8 @@ class BGP_message:
                         % (attr_count,offset,length,attr_flags,attr_type_code,hexlify(attribute)))
                 eprint("++failed to parse attribute : error: %s" % e)
                 eprint("++failed to parse attribute : %d %s" % (attributes_len,hexlify(attributes)))
+                traceback.print_tb( sys.exc_info()[2])
+                exit()
             offset += length+quantum
 
         
@@ -204,6 +208,7 @@ class BGP_message:
 
         self.attribute[code] = community_list
 
+
     def parse_attribute_AS_path(self,attr,as4=False):
 
     # an AS path attribute has 1 or more AS segments
@@ -216,44 +221,73 @@ class BGP_message:
     #
     # the result is a list of segments, each segment is a tuple (segment type, AS list)
     #
+    # NB!:
+    # AS paths can hold AS4 or AS2 and there is no way to know based on just the BGP message which is present
+    # ..... however.....
+    # it is exceedingly unlikely  that a valid path in one format is also valid in the other!
+    # So, attempting to parse as AS4 first is the right thing to do
 
-        if as4:
-            as_size = 4
-            fmt = '!I'
-            code = BGP_TYPE_CODE_AS4_PATH
-        else:
-            as_size = 2
-            fmt = '!H'
-            code = BGP_TYPE_CODE_AS_PATH
-
-        segment_list = []
-        attribute_offset = 0
-        attribute_length = len(attr)
-        while attribute_offset < attribute_length:
-            assert attribute_length - attribute_offset >= 4, \
-                    "minimum segment length check length %d offset %d" % (attribute_length,attribute_offset) 
-
-            path_segment_type = struct.unpack_from('!B', attr, offset=attribute_offset)[0]
-            assert path_segment_type == 1 or path_segment_type == 2, \
-                    "check valid AS segment type (SEQUENCE or SET, 1/2) (%d)" % path_segment_type
-
-            path_segment_length = struct.unpack_from('!B', attr, offset=attribute_offset+1)[0]
-            calculated_segment_byte_size = 2 + as_size*path_segment_length
-            remaining_bytes_in_segment = attribute_length - attribute_offset
-            assert remaining_bytes_in_segment >= calculated_segment_byte_size , \
-                    "AS Path attribute length check: remaining_bytes_in_segment >= calculated_segment_byte_size (%d,%d)" % (remaining_bytes_in_segment, calculated_segment_byte_size)
-
-            as_segment = attr[attribute_offset+2:attribute_offset+2+as_size*path_segment_length]
+    
+        def getb_at(msg,pos):
+            assert isinstance(msg,bytearray)
+            assert 0 < len(msg)
+            return struct.unpack_from('!B', msg, offset=pos)[0]
+    
+        def getw_at(msg,pos):
+            assert isinstance(msg,bytearray)
+            assert 0 < len(msg)
+            return struct.unpack_from('!H', msg, offset=pos)[0]
+    
+        def getl_at(msg,pos):
+            assert isinstance(msg,bytearray)
+            assert 0 < len(msg)
+            return struct.unpack_from('!I', msg, offset=pos)[0]
+    
+        def get_segment(msg,as4):
+    
+            if as4:
+                get_asn_at = getq_at
+                asn_len = 4
+                asn_shift = lambda n : n << 2
+            else:
+                get_asn_at = getl_at
+                asn_len = 2
+                asn_shift = lambda n : n << 1
+    
+            assert len(msg) >= 4
+    
+            segment_type = getb_at(msg,0)
+            assert path_segment_type == 1 or path_segment_type == 2
+    
+            segment_length = getb_at(msg,1)
+            assert len(msg) >= 2 + asn_shift(segment_length)
+    
             as_list = []
-            for i in range(path_segment_length):
-                as_list.append(struct.unpack_from(fmt, as_segment, offset=i*as_size)[0])
-
-            if as_list:
-                segment_list.append((path_segment_type,as_list))
-
-            attribute_offset += calculated_segment_byte_size
-
-        if segment_list:
+            offset = 0
+            for i in range(segment_length):
+                as_list.append(get_asn_at(msg, offset))
+                offset += asn_len
+    
+            return (path_segment_type,as_list,msg[2 + asn_shift(segment_length)])
+    
+        def get_segments(msg,as4):
+            segments=[]
+            while msg:
+                path_segment_type,as_list,msg = get_segment(msg,as4)
+                segments.append(path_segment_type,as_list)
+    
+        segments = []
+        try:
+            segments = get_segments(msg,True)
+            eprint("read AS path as AS4")
+        except:
+            try:
+                segments = get_segments(msg,False)
+                eprint("read AS path as AS2")
+            except:
+                eprint("could not read AS path as AS2 or AS4")
+    
+        if segments:
             self.attribute[code] = segment_list
 
     def parse_attribute_4b_4b(self,code,attr):

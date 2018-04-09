@@ -6,9 +6,9 @@
 import struct
 import sys
 def eprint(s):
-    return
     sys.stderr.write(s+'\n')
     sys.stderr.flush()
+    return
 
 class BMP_unblocker:
 
@@ -31,7 +31,7 @@ class BMP_unblocker:
         offset = 0
         bmp_msgs = []
         sub_block = 0
-        while offset < msg_len - 5:
+        while offset < msg_len - 4:
             version  = struct.unpack_from('!B', msg, offset=offset)[0]
             length   = struct.unpack_from('!I', msg, offset=offset+1)[0]
             msg_type = struct.unpack_from('!B', msg, offset=offset+5)[0]
@@ -48,10 +48,10 @@ class BMP_unblocker:
                 offset += length
                 sub_block +=1
                 continue
-            elif msg_len == offset + length:
-                self.msg_tail = bytearray()
-                eprint("BMP_unblocker: exit push with zero bytes unprocessed")
-                break
+            #elif msg_len == offset + length:
+                #self.msg_tail = bytearray()
+                #eprint("BMP_unblocker: exit push with zero bytes unprocessed")
+                #break
             else:
                 self.msg_tail = msg[offset:]
                 eprint("BMP_unblocker: exit push with %d bytes unprocessed" % len(self.msg_tail) )
