@@ -56,7 +56,6 @@ class BGP_message:
         assert self.bgp_length > 18 and self.bgp_length <= msg_len, "Invalid BGP message length %d/%d" % (self.bgp_length,msg_len)
         self.bgp_type = struct.unpack_from('!B', msg, offset=18)[0]
         assert self.bgp_type > 0 and self.bgp_type < 5, "Invalid BGP message type %d" % self.bgp_type
-        ## eprint( "++ BGP message rcvd length %d type %d" % (self.bgp_length,self.bgp_type))
 
         if self.bgp_type == BGP_UPDATE:
             self.parse_bgp_update(msg[19:self.bgp_length])
@@ -163,8 +162,8 @@ class BGP_message:
                 self.except_flag = True
                 eprint("++failed to parse attribute seq %d at offset %d/length %d, flags:code = (%x,%d) payload %s" \
                         % (attr_count,offset,length,attr_flags,attr_type_code,hexlify(attribute)))
-                eprint("++failed to parse attribute : error: %s" % e)
-                eprint("++failed to parse attribute : %d %s" % (attributes_len,hexlify(attributes)))
+                eprint("++failed to parse attribute  : error: %s" % e)
+                eprint("++failed to parse attributes : %d %s" % (attributes_len,hexlify(attributes)))
                 traceback.print_tb( sys.exc_info()[2])
                 exit()
             offset += length+quantum
@@ -245,7 +244,6 @@ class BGP_message:
             return struct.unpack_from('!I', msg, offset=pos)[0]
     
         def get_segment(msg,as4):
-            eprint("get_segment: %s" % msg.hex())
     
             if as4:
                 get_asn_at = getl_at
@@ -271,31 +269,32 @@ class BGP_message:
             return (segment_type,as_list,msg[2 + asn_shift(segment_length):])
     
         def get_segments(msg,as4):
-            eprint("get_segments: %s" % msg.hex())
             segments=[]
             while msg:
                 segment_type,as_list,msg = get_segment(msg,as4)
                 segments.append((segment_type,as_list))
             return segments
     
-        eprint("parse_attribute_AS_path: %s" % attr.hex())
         segments = []
         try:
             segments = get_segments(attr,True)
-            eprint("read AS path as AS4")
         except AssertionError as ae:
-            eprint("parse_attribute_AS_path: assert error %s" % ae)
-            traceback.print_tb( sys.exc_info()[2])
             try:
                 segments = get_segments(msg,False)
-                eprint("read AS path as AS2")
             except AssertionError as ae:
-                eprint("parse_attribute_AS_path: assert error %s" % ae)
-                traceback.print_tb( sys.exc_info()[2])
                 eprint("could not read AS path as AS2 or AS4")
     
         if segments:
             self.attribute[code] = segments
+
+    def parse_attribute_aggregator(self,code,attr):
+    # depending on AS4 nature this is either 8 bytes or 6 bytes
+            if len(attr) == 8:
+                self.parse_attribute_4b_4b(code,attr)
+            elif len(attr) == 6:
+                self.parse_attribute_2b_4b(code,attr)
+            else:
+                assert len(attr) == 6 or len(attr) == 8
 
     def parse_attribute_4b_4b(self,code,attr):
             assert len(attr) == 8
@@ -342,7 +341,7 @@ class BGP_message:
             self.parse_attribute_0_length(code,attr)
 
         elif (code==BGP_TYPE_CODE_AGGREGATOR):
-            self.parse_attribute_2b_4b(code,attr)
+            self.parse_attribute_aggregator(code,attr)
 
         elif (code==BGP_TYPE_CODE_COMMUNITIES):
             self.parse_attribute_communities(attr,code)
