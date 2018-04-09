@@ -37,6 +37,7 @@ BGP_TYPE_CODE_EXTENDED_COMMUNITIES = 16
 BGP_TYPE_CODE_AS4_PATH = 17
 BGP_TYPE_CODE_AS4_AGGREGATOR = 18
 BGP_TYPE_CODE_LARGE_COMMUNITY = 32
+BGP_TYPE_CODE_ATTR_SET = 128
 BGP_Attribute_Flags_Optional = 0x80 # 1 << 7
 BGP_Attribute_Flags_Transitive = 0x40 # 1 << 6
 BGP_Attribute_Flags_Partial = 0x20 # 1 << 5
@@ -196,6 +197,12 @@ class BGP_message:
             offset += 4
 
         self.attribute[code] = community_list
+
+    def parse_attribute_attribute_set(self,attr,code):
+
+        assert 4 < len(attr), "BGP  attribute set length less than 4 (%d)" % len(attr)
+
+        self.attribute[code] = ((struct.unpack_from('!I', attr, offset=0)[0],attr[4:]))
 
     def parse_attribute_extended_communities(self,attr,code):
 
@@ -373,8 +380,11 @@ class BGP_message:
         elif (code==BGP_TYPE_CODE_LARGE_COMMUNITY):
             self.parse_attribute_large_community(attr,code)
 
+        elif (code==BGP_TYPE_CODE_ATTR_SET):
+            self.parse_attribute_attribute_set(attr,code)
+
         else:
-            assert False , "Unknown BGP path attribuite type %d" % code
+            assert False , "Unknown BGP path attribute type %d" % code
 
     def parse_bgp_notification(self,msg):
         pass
