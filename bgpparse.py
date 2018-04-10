@@ -48,6 +48,10 @@ BGP_Attribute_Flags_Extended_Length = 0x10 # 1 << 4
 
 class BGP_message:
 
+    def __str__(self):
+        from pprint import pformat
+        return str(pformat(vars(self)))
+
     def __init__(self,msg):
         self.except_flag = False
         self.unhandled_codes = []
@@ -69,8 +73,31 @@ class BGP_message:
             self.parse_bgp_notification(msg[19:self.bgp_length])
 
     def __str__(self):
+        from pprint import pformat
         return str(pformat(vars(self)))
 
+
+    @staticmethod
+    def inner_tlv_parse(msg):
+        c_type   = struct.unpack_from('!B', msg, offset=0)[0]
+        c_length = struct.unpack_from('!B', msg, offset=1)[0]
+        assert len(msg) == c_length + 2, "sanity check, comparing %d >= %d" % (len(msg), c_length + 2)
+        c_value = msg[2:]
+        return (c_type,c_value)
+
+    @staticmethod
+    def tlv_parse(msg):
+        optional_parameters = {}
+        while 2 < len(msg):
+            p_type   = struct.unpack_from('!B', msg, offset=0)[0]
+            p_length = struct.unpack_from('!B', msg, offset=1)[0]
+            assert p_type == 2
+            assert len(msg) >= p_length + 2, "sanity check, comparing %d >= %d" % (len(msg), p_length + 2)
+            p_value = msg[2:2+p_length]
+            msg = msg[2+p_length:]
+            c_type,c_value = BGP_message.inner_tlv_parse(p_value)
+            optional_parameters[c_type] = c_value
+        return optional_parameters
 
     def parse_bgp_open(self,msg):
         self.bgp_open_version = struct.unpack_from('!B', msg, offset=0)[0]
@@ -78,10 +105,7 @@ class BGP_message:
         self.bgp_open_hold_time = struct.unpack_from('!H', msg, offset=3)[0]
         self.bgp_open_bgp_id = struct.unpack_from('!I', msg, offset=5)[0]
         parameter_length = struct.unpack_from('!B', msg, offset=9)[0]
-        self.bgp_open_optional_parameters = self.tlv_parse(msg[10:(9+parameter_length)])
-        pass
-
-    def tlv_parsemsg(self):
+        self.bgp_open_optional_parameters = self.tlv_parse(msg[10:10+parameter_length])
         pass
 
     def parse_bgp_update(self,msg):

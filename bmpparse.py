@@ -7,6 +7,7 @@ import struct
 import sys
 import os
 import time
+import bgppeel
 def eprint(s):
     sys.stderr.write(s+'\n')
     sys.stderr.flush()
@@ -47,6 +48,10 @@ def _get_tlvs(msg):
 
 class BMP_message:
 
+    def __str__(self):
+        from pprint import pformat
+        return str(pformat(vars(self)))
+
     def __init__(self,msg):
 
         def parse_route_monitoring(msg):
@@ -77,9 +82,24 @@ class BMP_message:
 
 
         def parse_peer_down(msg):
-            pass
+            reason = struct.unpack_from('!B', msg, offset=0)[0]
+            if 1 == len(msg):
+                self.bmp_peer_down = (reason,bytearray())
+            else:
+                self.bmp_peer_down = (reason,msg[1:])
+
         def parse_peer_up(msg):
-            pass
+            self.bmp_peer_up_local_address  = struct.unpack_from('!I', msg, offset=12)[0]
+            self.bmp_peer_up_local_port     = struct.unpack_from('!H', msg, offset=16)[0]
+            self.bmp_peer_up_remote_port    = struct.unpack_from('!H', msg, offset=18)[0]
+            sent_msg_type,self.bmp_peer_up_sent_open,tail = bgppeel.peel(msg[20:])
+            assert sent_msg_type == 1 # BGP OPEN type code
+            rcvd_msg_type,self.bmp_peer_up_rcvd_open,tail = bgppeel.peel(tail)
+            assert rcvd_msg_type == 1 # BGP OPEN type code
+            if 0 < len(tail):
+                tlvs = _get_tlvs(tail)
+                self.bmp_peer_up_information = tlvs
+
         def parse_initiation(msg):
             tlvs = _get_tlvs(msg)
             assert len(tlvs) > 1
@@ -99,7 +119,7 @@ class BMP_message:
             self.bmp_term_tlvs = tlvs
 
         def parse_route_mirroring(msg):
-            pass
+            assert False, "parse_route_mirroring NOT IMPLEMENTED"
 
         # parse the common header (CH)
         self.version  = struct.unpack_from('!B', msg, offset=0)[0]
