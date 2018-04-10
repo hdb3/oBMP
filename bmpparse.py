@@ -20,9 +20,57 @@ BMP_Initiation_Message = 4
 BMP_Termination_Message = 5
 BMP_Route_Mirroring_Message = 6
 
+BMP_Init_type_sysDescr = 1
+BMP_Init_type_sysName = 2
+
+
+def _get_tlv(msg):
+    #print("_get_tlvs %s" % msg.hex())
+    assert len(msg)>= 4
+    t = struct.unpack_from('!H', msg, offset=0)[0]
+    l = struct.unpack_from('!H', msg, offset=2)[0]
+    assert len(msg) >= l + 4
+    v = msg[4:l]
+    return (t,l,v)
+
+def _get_tlvs(msg):
+    #print("_get_tlvs %s" % msg.hex())
+    tlvs = []
+    while 0 < len(msg):
+        t,l,v = _get_tlv(msg)
+        tlvs.append((t,l,v))
+        msg = msg[4+l:]
+        tlv_dict = {}
+        for (t,l,v) in tlvs:
+            tlv_dict[t] = v
+    return tlv_dict
+
 class BMP_message:
 
     def __init__(self,msg):
+
+        def parse_route_monitoring(msg):
+            self.bmp_RM_bgp_message = msg
+        def parse_statistics(msg):
+            pass
+        def parse_peer_down(msg):
+            pass
+        def parse_peer_up(msg):
+            pass
+        def parse_initiation(msg):
+            tlvs = _get_tlvs(msg)
+            assert len(tlvs) > 1
+            assert BMP_Init_type_sysDescr in tlvs
+            assert BMP_Init_type_sysName in tlvs
+            print("sysDescr: %s" % tlvs[BMP_Init_type_sysDescr].decode('ascii'))
+            print("sysName: %s" % tlvs[BMP_Init_type_sysName].decode('ascii'))
+            self.bmp_init_tlvs = tlvs
+
+        def parse_termination(msg):
+            pass
+        def parse_route_mirroring(msg):
+            pass
+
         # parse the common header (CH)
         self.version  = struct.unpack_from('!B', msg, offset=0)[0]
         assert 3 == self.version
@@ -30,11 +78,7 @@ class BMP_message:
         self.msg_type = struct.unpack_from('!B', msg, offset=5)[0]
         msg_len  = len(msg)
         assert msg_len == self.length
-
-
-        if 6 < self.msg_type:
-            eprint("msg_type out of range %d" % self.msg_type)
-            return None
+        assert self.msg_type <= BMP_Route_Mirroring_Message, "msg_type out of range %d" % self.msg_type
 
         if (self.msg_type == BMP_Initiation_Message or self.msg_type == BMP_Termination_Message):
             pass # there is no PPC header in these messages
@@ -53,63 +97,36 @@ class BMP_message:
 
 
         if (self.msg_type == BMP_Route_Monitoring):
-            #self.bmp_RM_bgp_message = BGP_message(msg[48:])
-            self.bmp_RM_bgp_message = msg[48:]
+            parse_route_monitoring(msg[48:])
+        elif (self.msg_type == BMP_Statistics_Report):
+            parse_statistics(msg[48:])
+        elif (self.msg_type == BMP_Peer_Down_Notification):
+            parse_peer_down(msg[48:])
+        elif (self.msg_type == BMP_Peer_Up_Notification):
+            parse_peer_up(msg[48:])
+        elif (self.msg_type == BMP_Initiation_Message):
+            parse_initiation(msg[6:])
+        elif (self.msg_type == BMP_Termination_Message):
+            parse_termination(msg[6:])
+        elif (self.msg_type == BMP_Route_Mirroring_Message):
+            parse_route_mirroring(msg[48:])
 
-def BMP_dump(previous_message,msg):
-    ts = str(time.time())
-    try:
-        os.mkdir("dump")
-    #except OSError.FileExistsError:
-    except OSError as e:
-        print(e)
-    f = open("dump/"+ts+"-except.bmp","wb")
-    f.write(msg)
-    f = open("dump/"+ts+"-prev.bmp","wb")
-    f.write(previous_message)
-    return ts
+            
+    @classmethod
+    def get_next_parsed(cls,msg):
+        msg,bmp_msg = cls.get_next(msg)
+        return (msg,BMP_message(bmp_msg))
 
-BMP_last_message = None
-
-max_rcvd_message_length = 0
-def get_BMP_messages(msg):
-
-    global BMP_last_message,max_rcvd_message_length
-    previous_message = BMP_last_message
-    BMP_last_message = msg
-
-    msg_len  = len(msg)
-    if msg_len > max_rcvd_message_length:
-        max_rcvd_message_length = msg_len
-        eprint("-- max BMP message size %d" %  msg_len)
-
-    offset = 0
-    msgs = []
-    while offset < msg_len:
-        if msg_len - offset > 5:
-            version  = struct.unpack_from('!B', msg, offset=offset)[0]
-            length   = struct.unpack_from('!I', msg, offset=offset+1)[0]
-            msg_type = struct.unpack_from('!B', msg, offset=offset+5)[0]
+    @classmethod
+    def get_next(cls,msg):
+        if len(msg) < 6:
+            return (msg,bytearray())
+        version  = struct.unpack_from('!B', msg, offset=0)[0]
+        length   = struct.unpack_from('!I', msg, offset=1)[0]
+        msg_type = struct.unpack_from('!B', msg, offset=5)[0]
+        assert 3 == version, "failed version check, expected 3 got %x offset %d+%d" % (version,self.bytes_processed,offset)
+        assert msg_type < 7, "failed message type check, expected < 7, got %x" % msg_type
+        if len(msg) < length:
+            return (msg,bytearray())
         else:
-            version  = 0xff
-            length   = 0
-            msg_type = 0xff
-
-        if msg_len >= length + offset and 3 == version and msg_type < 7:
-            msgs.append((offset,length))
-            offset += length
-        else:
-            eprint("-- error parsing BMP messages (%d:%d:%d:%d)" % (len(msgs),msg_len,offset,length))
-            ts = BMP_dump(previous_message,msg)
-            eprint("-- dump file reference %s " % ts)
-            return []
-
-    # now process each separate chunk as a BMP message
-    bmp_msgs = []
-    if len(msgs) > 1:
-        eprint("--multipart BMP message with %d chunks" % len(msgs))
-    for (offset,length) in msgs:
-        if len(msgs) > 1:
-            eprint("--multipart BMP chunk at (%d :%d)" % (offset,length))
-        bmp_msgs.append(BMP_message(msg[offset:offset+length]))
-    return bmp_msgs
+            return (msg[length:],msg[:length])
