@@ -22,6 +22,8 @@ BMP_Route_Mirroring_Message = 6
 
 BMP_Init_type_sysDescr = 1
 BMP_Init_type_sysName = 2
+BMP_Term_type_reason = 1
+BMP_Term_type_string = 0
 
 
 def _get_tlv(msg):
@@ -67,7 +69,14 @@ class BMP_message:
             self.bmp_init_tlvs = tlvs
 
         def parse_termination(msg):
-            pass
+            tlvs = _get_tlvs(msg)
+            assert len(tlvs) > 0
+            assert BMP_Term_type_reason in tlvs
+            print("reason: %d" % tlvs[BMP_Term_type_reason].decode('ascii'))
+            if BMP_Term_type_string in tlvs:
+                print("string: %s" % tlvs[BMP_Term_type_string].decode('ascii'))
+            self.bmp_term_tlvs = tlvs
+
         def parse_route_mirroring(msg):
             pass
 
