@@ -256,14 +256,14 @@ class BGP_message:
     def parse_attribute_as_pathlimit(self,code,attr):
             assert len(attr) == 5
             self.attribute[code] = (struct.unpack_from('!B', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=1)[0])
-            eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.attribute[code]))
+            ##eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.attribute[code]))
 
     def parse_attribute_connector(self,code,attr):
         # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
 
             assert len(attr) >4
             self.attribute[code] = attr
-            eprint("parse_attribute_connector: value %s" % attr.hex())
+            ##eprint("parse_attribute_connector: value %s" % attr.hex())
 
 
     def parse_attribute_AS_path(self,code,attr,as4=False):
