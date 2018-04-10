@@ -21,22 +21,22 @@ class BmpContext:
         self.rib = BGPribdb.BGPribdb()
 
     def parse(self,msg):
-        if bmpmsg.msg_type == bmpparse.BMP_Initiation_Message:
-            print("-- BMP Initiation Message rcvd, length %d" % msg_length)
-        elif bmpmsg.msg_type == bmpparse.BMP_Peer_Up_Notification:
-            print("-- BMP Peer Up rcvd, length %d" % msg_length)
-        elif bmpmsg.msg_type == bmpparse.BMP_Statistics_Report:
-            print("-- BMP stats report rcvd, length %d" % msg_length)
-        elif bmpmsg.msg_type == bmpparse.BMP_Route_Monitoring:
-            #print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
-            parsed_bgp_message = bgpparse.BGP_message(bmpmsg.bmp_RM_bgp_message)
+        if msg.msg_type == bmpparse.BMP_Initiation_Message:
+            print("-- BMP Initiation Message rcvd, length %d" % msg.length)
+        elif msg.msg_type == bmpparse.BMP_Peer_Up_Notification:
+            print("-- BMP Peer Up rcvd, length %d" % msg.length)
+        elif msg.msg_type == bmpparse.BMP_Statistics_Report:
+            print("-- BMP stats report rcvd, length %d" % msg.length)
+        elif msg.msg_type == bmpparse.BMP_Route_Monitoring:
+            #print("-- BMP Route Monitoring rcvd, length %d" % msg.length)
+            parsed_bgp_message = bgpparse.BGP_message(msg.bmp_RM_bgp_message)
             self.rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
             if parsed_bgp_message.except_flag:
                 eprint("except during parsing at message no %d" % n)
             else:
                 self.rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
         else:
-            eprint("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
+            eprint("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg.msg_type,msg.length))
 
 if len(sys.argv) > 1:
     filename = sys.argv[1]
@@ -64,7 +64,7 @@ with open(filename,'rb') as f:
             filebuffer,bmp_msg = bmpparse.BMP_message.get_next(filebuffer)
             if bmp_msg:
                 tmp = bmpparse.BMP_message(bmp_msg)
-                #parser.parse(bmp_msg)
+                parser.parse(tmp)
                 n += 1
             else:
                 break
