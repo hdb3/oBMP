@@ -60,7 +60,6 @@ class BMP_message:
         def parse_statistics(msg):
             stats_count = struct.unpack_from('!I', msg, offset=0)[0]
             tlvs = _get_tlvs(msg[4:])
-            print("parse_statistics counts found %d/%d" % (stats_count,len(tlvs)))
             assert stats_count == len(tlvs)
             self.bmp_stats = {}
             for sr in tlvs.items():
@@ -72,14 +71,6 @@ class BMP_message:
                     self.bmp_stats[sr_type] = struct.unpack_from('!L', sr_val, offset=0)[0]
                 else:
                     assert False, "len(sr) = %d" % len(sr_val)
-
-            s = "Non-zero counters (type : value) - "
-            for t,v in self.bmp_stats.items():
-                #if True:
-                if 0 != v:
-                    s += ("(%d : %d) " % (t,v))
-            print(s)
-
 
         def parse_peer_down(msg):
             reason = struct.unpack_from('!B', msg, offset=0)[0]
@@ -105,17 +96,15 @@ class BMP_message:
             assert len(tlvs) > 1
             assert BMP_Init_type_sysDescr in tlvs
             assert BMP_Init_type_sysName in tlvs
-            print("sysDescr: %s" % tlvs[BMP_Init_type_sysDescr].decode('ascii'))
-            print("sysName: %s" % tlvs[BMP_Init_type_sysName].decode('ascii'))
             self.bmp_init_tlvs = tlvs
 
         def parse_termination(msg):
             tlvs = _get_tlvs(msg)
             assert len(tlvs) > 0
             assert BMP_Term_type_reason in tlvs
-            print("reason: %d" % tlvs[BMP_Term_type_reason].decode('ascii'))
+            eprint("reason: %d" % tlvs[BMP_Term_type_reason].decode('ascii'))
             if BMP_Term_type_string in tlvs:
-                print("string: %s" % tlvs[BMP_Term_type_string].decode('ascii'))
+                eprint("string: %s" % tlvs[BMP_Term_type_string].decode('ascii'))
             self.bmp_term_tlvs = tlvs
 
         def parse_route_mirroring(msg):
