@@ -27,16 +27,14 @@ BMP_Term_type_string = 0
 
 
 def _get_tlv(msg):
-    #print("_get_tlvs %s" % msg.hex())
     assert len(msg)>= 4
     t = struct.unpack_from('!H', msg, offset=0)[0]
     l = struct.unpack_from('!H', msg, offset=2)[0]
     assert len(msg) >= l + 4
-    v = msg[4:l]
+    v = msg[4:4+l]
     return (t,l,v)
 
 def _get_tlvs(msg):
-    #print("_get_tlvs %s" % msg.hex())
     tlvs = []
     while 0 < len(msg):
         t,l,v = _get_tlv(msg)
@@ -53,8 +51,31 @@ class BMP_message:
 
         def parse_route_monitoring(msg):
             self.bmp_RM_bgp_message = msg
+
         def parse_statistics(msg):
-            pass
+            stats_count = struct.unpack_from('!I', msg, offset=0)[0]
+            tlvs = _get_tlvs(msg[4:])
+            print("parse_statistics counts found %d/%d" % (stats_count,len(tlvs)))
+            assert stats_count == len(tlvs)
+            self.bmp_stats = {}
+            for sr in tlvs.items():
+                sr_type = sr[0]
+                sr_val  = sr[1]
+                if 4 == len(sr_val):
+                    self.bmp_stats[sr_type] = struct.unpack_from('!I', sr_val, offset=0)[0]
+                elif 8 == len(sr_val):
+                    self.bmp_stats[sr_type] = struct.unpack_from('!L', sr_val, offset=0)[0]
+                else:
+                    assert False, "len(sr) = %d" % len(sr_val)
+
+            s = "Non-zero counters (type : value) - "
+            for t,v in self.bmp_stats.items():
+                #if True:
+                if 0 != v:
+                    s += ("(%d : %d) " % (t,v))
+            print(s)
+
+
         def parse_peer_down(msg):
             pass
         def parse_peer_up(msg):
