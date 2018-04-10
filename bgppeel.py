@@ -34,6 +34,6 @@ def peel(msg,strict=True):
             return None
     else:
         if bgp_length == actual_msg_length:
-            return (bgp_type,msg,bytearray()]
+            return (bgp_type,msg,bytearray())
         else:
-            return (bgp_type,msg[:bgp_length],msg[bgp_length:]
+            return (bgp_type,msg[:bgp_length],msg[bgp_length:])
