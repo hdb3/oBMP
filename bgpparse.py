@@ -337,7 +337,7 @@ class BGP_message:
             segments = get_segments(attr,True)
         except AssertionError as ae:
             try:
-                segments = get_segments(msg,False)
+                segments = get_segments(attr,False)
             except AssertionError as ae:
                 eprint("could not read AS path as AS2 or AS4")
     
