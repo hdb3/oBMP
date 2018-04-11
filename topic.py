@@ -56,14 +56,14 @@ class Topic:
         if self.obmp_file_enabled:
             self.obmp_file.write(self.delimit(obmp_message))
 
-        bmp_message = oBMP_parse(obmp_message)
+        raw_bmp_message = oBMP_parse(obmp_message)
         if self.bmp_file_enabled:
-            self.bmp_file.write(bmp_message)
+            self.bmp_file.write(raw_bmp_message)
 
         if self.parse_enabled:
-            raw_msg,bmp_msg = bmpparse.BMP_message.get_next(raw_msg)
+            raw_bmp_message,bmp_msg = bmpparse.BMP_message.get_next(raw_bmp_message)
             while bmp_msg:
                 self.parser.parse(bmpparse.BMP_message(bmp_msg))
-                raw_msg,bmp_msg = bmpparse.BMP_message.get_next(raw_msg)
+                raw_bmp_message,bmp_msg = bmpparse.BMP_message.get_next(raw_bmp_message)
 
-            assert 0 == len(raw_msg)
+            assert 0 == len(raw_bmp_message)
