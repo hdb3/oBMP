@@ -45,7 +45,7 @@ class Session():
         log("Session.bmpd(%s) starting\n" % self.name)
         n=0
         r=1
-        parser = bmpapp.BmpContext()
+        parser = bmpapp.BmpContext(self.name)
         buf = bytearray()
         while True:
             msg = self.recv()

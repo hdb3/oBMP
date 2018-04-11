@@ -33,7 +33,7 @@ class Topic:
         if self.obmp_file_enabled:
             self.obmp_file = open("dump/" + self.topic + "-" + ts + ".obmp","wb")
         if parse_enabled:
-            self.parser = bmpapp.BmpContext()
+            self.parser = bmpapp.BmpContext(topic)
 
         sys.stderr.write("topic %s is active\n" % self.topic)
 
