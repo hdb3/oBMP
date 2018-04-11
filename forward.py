@@ -7,17 +7,18 @@
 #
 
 import yaml
+import struct
 import sys
+import os
 import socket
 import threading
-from time import sleep
+import time
 import pprint
 
 from oBMPparse import oBMP_parse
-import bgpparse
 import bmpparse
-# from bgpparse import *
-import BGPribdb
+import bmpapp
+import topic
 
 # kafka library and snappy installed via 'pip install kafka-python python-snappy'
 # snappy also requires dev headers - apt install libsnappy-dev
@@ -61,7 +62,7 @@ class Forwarder(threading.Thread):
                 except (socket.error,socket.timeout) as e:
                     self.last_socket_error = e
                     self.state = Retrying
-                    sleep(1)
+                    time.sleep(1)
                     continue
                 except Exception as e:
                     sys.stderr.write("unknown error %s" % e + " connecting to %s:%d\n" % self.address)
@@ -99,39 +100,55 @@ class Forwarder(threading.Thread):
 
 max_ribsize = 0
 
+msg_marker = struct.pack('!Q',0x9a9a9a9a9a9a9a9a)
+def delimit(msg):
+    assert isinstance(msg,bytearray)
+    header = bytestring(marker + struct.pack('!I',len(msg)) + struct.pack('!I',zlib.crc32(msg)))
+    return header.extend(msg) 
+
 def forward(collector,target):
     forwarder = Forwarder(target['host'],target['port'])
     forwarder.start()
-    rib = BGPribdb.BGPribdb()
 
     consumer = KafkaConsumer(bootstrap_servers=collector['bootstrap_servers'],client_id=collector['client_id'],group_id=collector['group_id'])
-    consumer.subscribe(topics=collector['topic'])
-    sys.stderr.write("listening to %s for topics %s\n" % (collector['bootstrap_servers'], collector['topic']))
+
+    if 'pattern' in collector:
+        if (collector['pattern'] in ('*','all')):
+            pattern = '.*'
+        else:
+            pattern = collector['pattern']
+        consumer.subscribe(pattern=pattern)
+        sys.stderr.write("listening to %s for pattern %s\n" % (collector['bootstrap_servers'], pattern))
+    elif 'topics' in collector:
+        consumer.subscribe(topics=collector['topics'])
+        topics = ','.join(collector['topics'])
+        sys.stderr.write("listening to %s for topics %s\n" % (collector['bootstrap_servers'], topics))
+    else:
+        sys.stderr.write("error - neither topics nor pattern defined")
+
     messages_received = 0
+    current_topics = {}
+
     for message in consumer:
-        assert message.topic == collector['topic']
-        if not messages_received:
-            sys.stderr.write("first message received\n")
         messages_received += 1
-        raw_msg = oBMP_parse(message.value)
+        #assert message.topic == collector['topic']
+        if message.topic not in current_topics:
+            current_topics[message.topic] = topic.Topic(message.topic)
 
-        bmpmsgs = bmpparse.get_BMP_messages(raw_msg)
-        for bmpmsg in bmpmsgs:
-            if bmpmsg.msg_type == bmpparse.BMP_Statistics_Report:
-                print("-- BMP stats report rcvd, length %d" % bmpmsg.length)
-                print(rib)
-            elif bmpmsg.msg_type == bmpparse.BMP_Route_Monitoring:
-                bgpmsg = bmpmsg.bmp_RM_bgp_message
-                parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
-                rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
-                if parsed_bgp_message.except_flag:
-                    forwarder.send(bgpmsg)
-                else:
-                    rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
-            else:
-                sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (bmpmsg.msg_type,bmpmsg.length))
+        current_topics[message.topic].process(bytearray(message.value))
+        #self.send(msg)
 
-with open("config.yml", 'r') as ymlfile:
+        sys.stderr.write("message rcvd %d\r" % messages_received)
+        sys.stderr.flush()
+
+    current_topics[message.topic].exit()
+
+if len(sys.argv) > 1:
+    config_file = sys.argv[1]
+else:
+    config_file = "forward.yml"
+
+with open(config_file, 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
     if ('forward' not in cfg):
         sys.exit("could not find section 'forward' in config file")
