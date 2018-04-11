@@ -51,24 +51,23 @@ class Session():
             msg = self.recv()
             if msg is None:
                 print("null message")
-                sleep(10)
-                continue
-            if len(msg) == 0:
+                break
+            elif len(msg) == 0:
                 print("empty message")
-                sleep(10)
-                continue
+                break
             else:
-                print("non-empty message")
                 r += 1
                 buf.extend(msg)
                 #filebuffer,bmp_msg = bmpparse.BMP_message.get_next_parsed(filebuffer)
                 buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
                 while bmp_msg:
+                    ##print(len(buf),len(bmp_msg))
                     parser.parse(bmpparse.BMP_message(bmp_msg))
                     n += 1
-                print("%d messages processed" % n)
-                print("%d blocks read" % r)
-                print(parser.rib)
+                    buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
+        print("%d messages processed" % n)
+        print("%d blocks read" % r)
+        print(parser.rib)
         log("Session.bmpd(%s) exiting\n" % self.name)
 
     def sink(self):
