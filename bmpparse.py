@@ -110,6 +110,8 @@ class BMP_message:
         def parse_route_mirroring(msg):
             assert False, "parse_route_mirroring NOT IMPLEMENTED"
 
+        # save the original binary message for diagnostics later
+        self.msg = msg
         # parse the common header (CH)
         self.version  = struct.unpack_from('!B', msg, offset=0)[0]
         assert 3 == self.version

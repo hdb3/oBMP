@@ -131,9 +131,8 @@ def forward(collector,target):
 
     for message in consumer:
         messages_received += 1
-        #assert message.topic == collector['topic']
         if message.topic not in current_topics:
-            current_topics[message.topic] = topic.Topic(message.topic)
+            current_topics[message.topic] = topic.Topic(message.topic,parse_enabled=True)
 
         current_topics[message.topic].process(bytearray(message.value))
         #self.send(msg)

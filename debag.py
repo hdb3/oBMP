@@ -2,10 +2,19 @@
 import struct
 import sys
 import zlib
+import topic
 
 BUFSIZE = 0x100000
 _msg_marker = struct.pack('!Q',0x9a9a9a9a9a9a9a9a)
 
+
+def start_process_chunk():
+    global topic
+    topic = topic.Topic("debag.py",parse_enabled=True)
+
+def process_chunk(chunk):
+    global topic
+    topic.process(chunk)
 
 def delimit(msg):
     assert isinstance(msg,bytearray)
@@ -19,6 +28,7 @@ marker_length = len(_msg_marker)
 #print("marker length is ",marker_length)
 if len(sys.argv) > 1:
     with open(sys.argv[1], 'rb') as delimited_file:
+        start_process_chunk()
         offset = 0
         chunks = 0
         total_chunk_length = 0
@@ -39,13 +49,18 @@ if len(sys.argv) > 1:
                         break
                     else:
                         buf_length = len(buf)
-            assert len(buf) >= chunk_length, "failed to read enough bytes for a chunk"
+            if len(buf) < chunk_length:
+                sys.stderr.write("failed to read enough bytes for a chunk")
+                break
             chunk = buf[header_length:chunk_length+header_length]
             buf = buf[header_length+chunk_length:]
-            assert chunk_crc32 == zlib.crc32(chunk), "%x %x %s" % (chunk_crc32,zlib.crc32(chunk),chunk.hex())
+            if chunk_crc32 != zlib.crc32(chunk):
+                sys.stderr.write("crc check failed at chunk %d chunk length %d chunk offset %d" % (chunks,chunk_length,total_chunk_length))
+                break
             chunks += 1
             total_chunk_length += chunk_length
             sys.stderr.write("read chunk %d, length %d\r" % (chunks,chunk_length))
+            process_chunk(chunk)
         delimited_file.close()
         sys.stderr.write("\nread %d chunks, total data length %d\n" % (chunks,total_chunk_length))
         if len(buf) != 0:

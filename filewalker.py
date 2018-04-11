@@ -35,7 +35,7 @@ else:
 
 n=0
 with open(filename,'rb') as f:
-    parser = bmpapp.BmpContext()
+    parser = bmpapp.BmpContext(filename)
     filebuffer = bytearray(f.read(bufsiz))
     r=1
     while True:
