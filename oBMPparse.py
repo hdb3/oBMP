@@ -15,6 +15,7 @@ def eprint(s):
 #refer to ./docs/MESSAGE_BUS_API.md in branch 'caida' of https://github.com/CAIDA/openbmp.git
 
 def oBMP_parse(msg):
+    assert isinstance(msg,bytearray)
     payload = None
     if (0x4F424D50 == struct.unpack_from('!I', msg, offset=0)[0]):
         # this is the obmp version 1.7+ binary format
