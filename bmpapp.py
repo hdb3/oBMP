@@ -50,9 +50,14 @@ class BmpContext:
             ##print(rcvd_open)
         elif msg.msg_type == bmpparse.BMP_Statistics_Report:
             print("-- BMP stats report rcvd, length %d" % msg.length)
+            print(self.rib)
         elif msg.msg_type == bmpparse.BMP_Route_Monitoring:
             #print("-- BMP Route Monitoring rcvd, length %d" % msg.length)
             parsed_bgp_message = bgpparse.BGP_message(msg.bmp_RM_bgp_message)
+            if 0 == len(parsed_bgp_message.withdrawn_prefixes) and 0 == len(parsed_bgp_message.prefixes):
+                print("End-ofRIB received")
+                print(self.rib)
+                print(parsed_bgp_message.attribute)
             self.rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
             if parsed_bgp_message.except_flag:
                 eprint("except during parsing at message no %d" % n)
