@@ -38,11 +38,15 @@ class Session():
             self.run()
 
     def bmpd(self):
-        rib = BGPribdb.BGPribdb()
-        blkparser = bmpblkparse.BMP_unblocker(parse=False)
-        i = 0
+        import bmpparse
+        import bgpparse
+        import BGPribdb
+        import bmpapp
         log("Session.bmpd(%s) starting\n" % self.name)
-
+        n=0
+        r=1
+        parser = bmpapp.BmpContext()
+        buf = bytearray()
         while True:
             msg = self.recv()
             if msg is None:
@@ -53,47 +57,43 @@ class Session():
                 print("empty message")
                 sleep(10)
                 continue
-            i += 1
-            print("msg(%d) rcvd length %d" % (i,len(msg)))
-            blkparser.push(msg)
-            bmpmsgs = blkparser.pull()
-            print("BMP block parser returned %d BMP messages" % len(bmpmsgs))
-            #bmpmsg = bmpparse.BMP_message(msg)
-            for bmpmsg in bmpmsgs:
-                msg_type = blkparser.bmp_message_type(bmpmsg)
-                msg_length = len(bmpmsg)
-                if msg_type == bmpparse.BMP_Initiation_Message:
-                    print("-- BMP Initiation Message rcvd, length %d" % msg_length)
-                elif msg_type == bmpparse.BMP_Peer_Up_Notification:
-                    print("-- BMP Peer Up rcvd, length %d" % msg_length)
-                elif msg_type == bmpparse.BMP_Statistics_Report:
-                    print("-- BMP stats report rcvd, length %d" % msg_length)
-                    ##print(rib)
-                elif msg_type == bmpparse.BMP_Route_Monitoring:
-                    print("-- BMP Route Monitoring rcvd, length %d" % msg_length)
-                    #bgpmsg = bmpmsg.bmp_RM_bgp_message
-                    #parsed_bgp_message = bgpparse.BGP_message(bgpmsg)
-                    ##rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
-                    ##if parsed_bgp_message.except_flag:
-                        ##forwarder.send(bgpmsg)
-                    ##else:
-                        ##rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
-                else:
-                    sys.stderr.write("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg_type,msg_length))
-
-
+            else:
+                print("non-empty message")
+                r += 1
+                buf.extend(msg)
+                #filebuffer,bmp_msg = bmpparse.BMP_message.get_next_parsed(filebuffer)
+                buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
+                while bmp_msg:
+                    parser.parse(bmpparse.BMP_message(bmp_msg))
+                    n += 1
+                print("%d messages processed" % n)
+                print("%d blocks read" % r)
+                print(parser.rib)
         log("Session.bmpd(%s) exiting\n" % self.name)
 
     def sink(self):
-        i = 0
+        from time import time
         log("Session.sink(%s) starting\n" % self.name)
+
+        try:
+            os.mkdir("dump")
+        except OSError as e:
+            pass
+
+        ts = str(time())
+        fn = "dump/" + self.name + "-" + ts + ".bmp"
+        f = open(fn,"wb")
+
+        i = 0
         msg = self.recv()
 
         while msg:
             print("msg(%d) rcvd length %d" % (i,len(msg)))
             i += 1
+            f.write(msg)
             msg = self.recv()
 
+        f.close()
         log("Session.sink(%s) exiting\n" % self.name)
 
     def source(self):
@@ -254,13 +254,19 @@ class Collector(threading.Thread):
             return None
         else:
             try:
-                msg = self.sock.recv(BUFSIZ)
-                fullmsg = msg
-                while BUFSIZ == len(msg):
-                    self.log_err("\nget more bytes on recv\n")
-                    msg = self.sock.recv(BUFSIZ, socket.MSG_DONTWAIT)
-                    fullmsg += msg
-                return fullmsg
+                return self.sock.recv(BUFSIZ)
+
+                ## below is pointless if the service can handle fractional messages
+                ## which it must!!!
+                ## however, writing into a local buffer might make sense.....
+
+                ##msg = self.sock.recv(BUFSIZ)
+                ##fullmsg = msg
+                ##while BUFSIZ == len(msg):
+                    ##self.log_err("\nget more bytes on recv\n")
+                    ##msg = self.sock.recv(BUFSIZ, socket.MSG_DONTWAIT)
+                    ##fullmsg += msg
+                ##return fullmsg
 
             except socket.timeout:
                 self.sock.close()
