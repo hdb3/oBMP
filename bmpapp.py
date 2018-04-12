@@ -64,16 +64,25 @@ class BmpContext():
             #print("-- BMP Route Monitoring rcvd, length %d" % msg.length)
             parsed_bgp_message = bgpparse.BGP_message(msg.bmp_RM_bgp_message)
             if 0 == len(parsed_bgp_message.withdrawn_prefixes) and 0 == len(parsed_bgp_message.prefixes):
-                self.dump_file.write(msg.msg)
-                self.dump_file.flush()
-                pass
-                ## print("End-of-RIB received")
-                ## print(self.rib)
+                if 0 == len(parsed_bgp_message.attribute):
+                    self.dump_file.write(msg.msg)
+                    self.dump_file.flush()
+                    print("-- ID:%s - End-of-RIB received" % self.name)
+                    print(self.rib)
+                else:
+                    pass
+                    #~# print("-- ID:%s - empty update received" % self.name)
+                    #~# if bgpparse.BGP_TYPE_CODE_AS_PATH in parsed_bgp_message.attribute:
+                        #~# print("AS path: ", parsed_bgp_message.attribute[bgpparse.BGP_TYPE_CODE_AS_PATH])
+                    #~# else:
+                        #~# print(parsed_bgp_message.attribute)
+                        #~# self.dump_file.write(msg.msg)
+                        #~# self.dump_file.flush()
                 ## print(parsed_bgp_message.attribute)
-            self.rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
             if parsed_bgp_message.except_flag:
                 eprint("except during parsing at message no %d" % n)
             else:
                 self.rib.update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
+                self.rib.withdraw(parsed_bgp_message.withdrawn_prefixes)
         else:
             eprint("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg.msg_type,msg.length))
