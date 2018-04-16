@@ -24,7 +24,7 @@ def log(c):
 
 class Session():
 
-    def __init__(self,name,send,recv,app=None):
+    def __init__(self,app,name,send,recv):
         self.name = name
         self.recv = recv
         self.send = send
@@ -51,22 +51,15 @@ class Session():
         buf = bytearray()
         while True:
             msg = self.recv()
-            if msg is None:
-                print("null message")
-                break
-            elif len(msg) == 0:
-                print("empty message")
-                break
-            else:
-                r += 1
-                buf.extend(msg)
-                #filebuffer,bmp_msg = bmpparse.BMP_message.get_next_parsed(filebuffer)
+            r += 1
+            buf.extend(msg)
+            #filebuffer,bmp_msg = bmpparse.BMP_message.get_next_parsed(filebuffer)
+            buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
+            while bmp_msg:
+                ##print(len(buf),len(bmp_msg))
+                parser.parse(bmpparse.BMP_message(bmp_msg))
+                n += 1
                 buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
-                while bmp_msg:
-                    ##print(len(buf),len(bmp_msg))
-                    parser.parse(bmpparse.BMP_message(bmp_msg))
-                    n += 1
-                    buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
         print("%d messages processed" % n)
         print("%d blocks read" % r)
         print(parser.rib)
@@ -143,16 +136,16 @@ def _name(address):
 
 class Collector(threading.Thread):
 
-    def __init__(self,target,name,host,port):
+    def __init__(self,app,name,host,port):
         ## why not just use super????
         ## super().__init__(self,name=name,daemon=False))
         threading.Thread.__init__(self,name=name,daemon=False)
         self.state = Initialising
+        self.app = app
         self.connections = 0
         self.event = threading.Event()
         self.address = (host,port)
         self.log_err = lambda s : log("%s: %s\n" % (self.name,s))
-        print("Collector.__init()__")
 
 
     def recv(self):
@@ -207,8 +200,7 @@ class Collector(threading.Thread):
 class Listener(Collector):
 
     def __init__(self,*args,**kwargs):
-        super().__init__(self,*args,**kwargs)
-        print("Listener.__init()__")
+        super().__init__(*args,**kwargs)
 
     def run(self):
         self.state = Connecting
@@ -253,7 +245,7 @@ class Listener(Collector):
                 self.state = Connected
                 self.connections += 1
                 self.log_err("connected to %s\n" % _name(remote_address))
-                session = Session(self.name,self.send,self.recv)
+                session = Session(self.app,self.name,self.send,self.recv)
                 try:
                     self.sock.shutdown(socket.SHUT_RDWR)
                     self.sock.close()
@@ -277,23 +269,26 @@ class Listener(Collector):
 class Talker(Collector):
 
     def __init__(self,*args,**kwargs):
-        super().__init__(self,*args,**kwargs)
-        print("Talker.__init()__")
+        super().__init__(*args,**kwargs)
 
     def run(self):
         self.state = Connecting
         while True:
             try:
-                if self.connections == 0:
-                    self.log_err("attempting connection to %s\n" % _name(self.address))
-                else:
-                    self.log_err("reattempting connection to %s\n" % _name(self.address))
+                if self.state == Connecting:
+                    # only print out the message once per new connection attempt
+                    # i.e. not every 1 second whilst retrying after timeout
+                    if self.connections == 0:
+                        self.log_err("attempting connection to %s\n" % _name(self.address))
+                    else:
+                        self.log_err("reattempting connection to %s\n" % _name(self.address))
                 self.sock = socket.create_connection(self.address,1)
                 self.sock.setblocking(True)
                 self.state = Connected
                 self.connections += 1
                 self.log_err("connected to %s\n" % _name(self.address))
-                session = Session(self.name,self.send,self.recv)
+                self.connections += 1
+                session = Session(self.app,self.name,self.send,self.recv)
                 self.sock.close()
                 self.sock.shutdown(socket.SHUT_RDWR)
             except (socket.error,socket.timeout) as e:
@@ -319,6 +314,9 @@ def main(name,config):
     else:
         collector_cfg=cfg['collector']
 
+    if ('daemon' not in collector_cfg):
+        sys.exit("could not find sub-section 'daemon' in config file")
+
     if ('listener' not in collector_cfg and 'targets' not in collector_cfg):
         sys.exit("could not find sub-section 'targets' or 'listener' in config file")
 
@@ -328,17 +326,14 @@ def main(name,config):
         for cfg_target in cfg_targets:
             assert 'host' in cfg_target
             assert 'port' in cfg_target
-            collectors.append(Talker(name,cfg_target['host'],cfg_target['port']))
+            collectors.append(Talker(collector_cfg['daemon'],name,cfg_target['host'],cfg_target['port']))
 
     if ('listener' in collector_cfg):
         cfg_listener = collector_cfg['listener']
         ## TODO move this functionality into the listener code
         if '*' == cfg_listener['host']:
             cfg_listener['host'] = ''
-        collectors.append(Listener(name,cfg_listener['host'],cfg_listener['port']))
-
-    if ('daemon' in collector_cfg):
-        cfg_targets = collector_cfg['daemon']
+        collectors.append(Listener(collector_cfg['daemon'],name,cfg_listener['host'],cfg_listener['port']))
 
     for collector in collectors:
         collector.start()
