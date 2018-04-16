@@ -24,16 +24,18 @@ def log(c):
 
 class Session():
 
-    def __init__(self,name,send,recv):
+    def __init__(self,name,send,recv,app=None):
         self.name = name
         self.recv = recv
         self.send = send
-        if 'sink' in name.lower():
-            self.sink()
-        elif 'source' in name.lower():
-            self.source()
-        elif 'bmpd' in name.lower():
-            self.bmpd()
+
+        if app:
+            if hasattr(self,app):
+                getattr(self,app)()
+            else:
+                sys.exit("requested app '%s' not found" % app)
+        elif hasattr(self,name):
+            getattr(self,name)()
         else:
             self.run()
 
@@ -138,134 +140,27 @@ def _name(address):
     assert isinstance(address,tuple)
     return "%s:%d" % address
 
+
 class Collector(threading.Thread):
 
-    def __init__(self,name,host,port,passive=False):
-        threading.Thread.__init__(self)
-        self.name = name
-        self.passive = passive
-        self.daemon = False # keep main prog until collectors exit
+    def __init__(self,target,name,host,port):
+        ## why not just use super????
+        ## super().__init__(self,name=name,daemon=False))
+        threading.Thread.__init__(self,name=name,daemon=False)
         self.state = Initialising
         self.connections = 0
         self.event = threading.Event()
         self.address = (host,port)
         self.log_err = lambda s : log("%s: %s\n" % (self.name,s))
-
-    def run(self):
-        self.state = Connecting
-        if self.passive:
-            self.log_err("awaiting connection on %s\n" % _name(self.address))
-            self.listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            for i in range(100):
-                try:
-                    self.state = Error
-                    self.listen_sock.bind(self.address)
-                    self.state = Connecting
-                    if i > 0:
-                        self.log_err("bind success!")
-                    break
-                except OSError as e:
-                    if e.errno != errno.EADDRINUSE:
-                        raise
-                    else:
-                        if i == 0:
-                            self.log_err("bind - address in use - will wait and try again")
-                        else:
-                            log("~")
-                        sleep(3)
-                except (socket.herror,socket.gaierror) as e:
-                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
-                    traceback.print_tb( sys.exc_info()[2],limit=9)
-                    self.state = Error
-                except Exception as e:
-                    self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
-                    traceback.print_tb( sys.exc_info()[2],limit=9)
-                    self.state = Error
-
-            if self.state == Error:
-                self.log_err("bind - address in use - giving up")
-                exit()
-
-            self.listen_sock.listen(1)
-
-            while self.state != Error:
-                try:
-                    self.sock,remote_address = self.listen_sock.accept()
-                    self.sock.setblocking(True)
-                    self.state = Connected
-                    self.connections += 1
-                    self.log_err("connected to %s\n" % _name(remote_address))
-                    session = Session(self.name,self.send,self.recv)
-                    try:
-                        self.sock.shutdown(socket.SHUT_RDWR)
-                        self.sock.close()
-                    except Exception as e:
-                        self.log_err("ignored exception closing listen socket: %s\n" % str(e))
-                        traceback.print_tb( sys.exc_info()[2],limit=9)
-                except (socket.herror,socket.gaierror) as e:
-                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
-                    traceback.print_tb( sys.exc_info()[2],limit=9)
-                    self.state = Error
-                    break
-                except Exception as e:
-                    self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
-                    traceback.print_tb( sys.exc_info()[2],limit=9)
-                    self.state = Error
-                    sleep(10)
-                    self.log_err("reawaiting connection on %s\n" % _name(self.address))
-                    continue
-
-        else:
-            while True:
-                try:
-                    if self.connections == 0:
-                        self.log_err("attempting connection to %s\n" % _name(self.address))
-                    else:
-                        self.log_err("reattempting connection to %s\n" % _name(self.address))
-                    self.sock = socket.create_connection(self.address,1)
-                    self.sock.setblocking(True)
-                    self.state = Connected
-                    self.connections += 1
-                    self.log_err("connected to %s\n" % _name(self.address))
-                    session = Session(self.name,self.send,self.recv)
-                    self.sock.close()
-                    self.sock.shutdown(socket.SHUT_RDWR)
-                except (socket.error,socket.timeout) as e:
-                    self.last_socket_error = e
-                    self.state = Retrying
-                    sleep(1)
-                    continue
-                except (socket.herror,socket.gaierror) as e:
-                    self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
-                    traceback.print_tb( sys.exc_info()[2],limit=9)
-                    self.state = Error
-                    break
-                except Exception as e:
-                    self.log_err("unknown error %s" % e + " connecting to %s\n" % _name(self.address))
-                    traceback.print_tb( sys.exc_info()[2],limit=9)
-                    self.state = Error
-                    break
+        print("Collector.__init()__")
 
 
     def recv(self):
         if self.state != Connected:
-            log('r')
             return None
         else:
             try:
                 return self.sock.recv(BUFSIZ)
-
-                ## below is pointless if the service can handle fractional messages
-                ## which it must!!!
-                ## however, writing into a local buffer might make sense.....
-
-                ##msg = self.sock.recv(BUFSIZ)
-                ##fullmsg = msg
-                ##while BUFSIZ == len(msg):
-                    ##self.log_err("\nget more bytes on recv\n")
-                    ##msg = self.sock.recv(BUFSIZ, socket.MSG_DONTWAIT)
-                    ##fullmsg += msg
-                ##return fullmsg
 
             except socket.timeout:
                 self.sock.close()
@@ -290,11 +185,9 @@ class Collector(threading.Thread):
                 self.state = Error
                 return None
 
-            log('+')
-
     def send(self,msg):
         if self.state != Connected:
-            log('s')
+            pass
         else:
             try:
                 self.sock.sendall(msg)
@@ -309,32 +202,143 @@ class Collector(threading.Thread):
                     self.log_err("socket manager has exited\n")
                     self.state = Error
                     sys.exit()
-            log('S')
             return True
+
+class Listener(Collector):
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(self,*args,**kwargs)
+        print("Listener.__init()__")
+
+    def run(self):
+        self.state = Connecting
+        self.log_err("awaiting connection on %s\n" % _name(self.address))
+        self.listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        for i in range(100):
+            try:
+                self.state = Error
+                self.listen_sock.bind(self.address)
+                self.state = Connecting
+                if i > 0:
+                    self.log_err("bind success!")
+                break
+            except OSError as e:
+                if e.errno != errno.EADDRINUSE:
+                    raise
+                else:
+                    if i == 0:
+                        self.log_err("bind - address in use - will wait and try again")
+                    else:
+                        log("~")
+                    sleep(3)
+            except (socket.herror,socket.gaierror) as e:
+                self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
+                traceback.print_tb( sys.exc_info()[2],limit=9)
+                self.state = Error
+            except Exception as e:
+                self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
+                traceback.print_tb( sys.exc_info()[2],limit=9)
+                self.state = Error
+
+        if self.state == Error:
+            self.log_err("bind - address in use - giving up")
+            exit()
+
+        self.listen_sock.listen(1)
+
+        while self.state != Error:
+            try:
+                self.sock,remote_address = self.listen_sock.accept()
+                self.sock.setblocking(True)
+                self.state = Connected
+                self.connections += 1
+                self.log_err("connected to %s\n" % _name(remote_address))
+                session = Session(self.name,self.send,self.recv)
+                try:
+                    self.sock.shutdown(socket.SHUT_RDWR)
+                    self.sock.close()
+                except Exception as e:
+                    self.log_err("ignored exception closing listen socket: %s\n" % str(e))
+                    traceback.print_tb( sys.exc_info()[2],limit=9)
+            except (socket.herror,socket.gaierror) as e:
+                self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
+                traceback.print_tb( sys.exc_info()[2],limit=9)
+                self.state = Error
+                break
+            except Exception as e:
+                self.log_err(("unknown error %s" % e) + (" connecting to %s\n" % _name(self.address)))
+                traceback.print_tb( sys.exc_info()[2],limit=9)
+                self.state = Error
+                sleep(10)
+                self.log_err("reawaiting connection on %s\n" % _name(self.address))
+                continue
+
+
+class Talker(Collector):
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(self,*args,**kwargs)
+        print("Talker.__init()__")
+
+    def run(self):
+        self.state = Connecting
+        while True:
+            try:
+                if self.connections == 0:
+                    self.log_err("attempting connection to %s\n" % _name(self.address))
+                else:
+                    self.log_err("reattempting connection to %s\n" % _name(self.address))
+                self.sock = socket.create_connection(self.address,1)
+                self.sock.setblocking(True)
+                self.state = Connected
+                self.connections += 1
+                self.log_err("connected to %s\n" % _name(self.address))
+                session = Session(self.name,self.send,self.recv)
+                self.sock.close()
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except (socket.error,socket.timeout) as e:
+                self.last_socket_error = e
+                self.state = Retrying
+                sleep(1)
+                continue
+            except (socket.herror,socket.gaierror) as e:
+                self.log_err("unrecoverable error %s" % e + " connecting to %s\n" % _name(self.address))
+                traceback.print_tb( sys.exc_info()[2],limit=9)
+                self.state = Error
+                break
+            except Exception as e:
+                self.log_err("unknown error %s" % e + " connecting to %s\n" % _name(self.address))
+                traceback.print_tb( sys.exc_info()[2],limit=9)
+                self.state = Error
+                break
 
 def main(name,config):
 
     if ('collector' not in cfg):
         sys.exit("could not find section 'collector' in config file")
     else:
-        forward_cfg=cfg['collector']
+        collector_cfg=cfg['collector']
 
-    if ('listener' not in forward_cfg and 'targets' not in forward_cfg):
+    if ('listener' not in collector_cfg and 'targets' not in collector_cfg):
         sys.exit("could not find sub-section 'targets' or 'listener' in config file")
 
     collectors = []
-    if ('targets' in forward_cfg):
-        cfg_targets = forward_cfg['targets']
-        for target in cfg_targets:
-            assert 'host' in target
-            assert 'port' in target
-            collectors.append(Collector(name,target['host'],target['port'],passive=False))
+    if ('targets' in collector_cfg):
+        cfg_targets = collector_cfg['targets']
+        for cfg_target in cfg_targets:
+            assert 'host' in cfg_target
+            assert 'port' in cfg_target
+            collectors.append(Talker(name,cfg_target['host'],cfg_target['port']))
 
-    if ('listener' in forward_cfg):
-        cfg_listener = forward_cfg['listener']
+    if ('listener' in collector_cfg):
+        cfg_listener = collector_cfg['listener']
+        ## TODO move this functionality into the listener code
         if '*' == cfg_listener['host']:
             cfg_listener['host'] = ''
-        collectors.append(Collector(name,cfg_listener['host'],cfg_listener['port'],passive=True))
+        collectors.append(Listener(name,cfg_listener['host'],cfg_listener['port']))
+
+    if ('daemon' in collector_cfg):
+        cfg_targets = collector_cfg['daemon']
 
     for collector in collectors:
         collector.start()
