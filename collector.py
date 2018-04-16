@@ -37,8 +37,6 @@ class Session():
 
     def bmpd(self):
         import bmpparse
-        import bgpparse
-        import BGPribdb
         import bmpapp
         log("Session.bmpd(%s) starting\n" % self.name)
         n=0
@@ -52,14 +50,12 @@ class Session():
             #filebuffer,bmp_msg = bmpparse.BMP_message.get_next_parsed(filebuffer)
             buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
             while bmp_msg:
-                ##print(len(buf),len(bmp_msg))
                 parser.parse(bmpparse.BMP_message(bmp_msg))
                 n += 1
                 buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
             msg = self.recv()
         print("%d messages processed" % n)
         print("%d blocks read" % r)
-        print(parser.rib)
         log("Session.bmpd(%s) exiting\n" % self.name)
 
     def sink(self):
@@ -135,7 +131,8 @@ class Collector(threading.Thread):
 
     def __init__(self,app,name,host,port):
         ## why not just use super????
-        ## super().__init__(self,name=name,daemon=False))
+        ## - -  well it doesn't work so don't....
+        ##super().__init__(self,name=name,daemon=False)
         threading.Thread.__init__(self,name=name,daemon=False)
         self.state = Initialising
         self.app = app
