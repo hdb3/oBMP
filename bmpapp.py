@@ -31,17 +31,22 @@ class BmpContext():
         peer_hash = msg.bmp_ppc_fixed_hash
         assert peer_hash in self.peers
         assert msg.msg_type == bmpparse.BMP_Peer_Up_Notification
-        self.peers[peer_hash]['Peer_Up_data'] = {}
-        self.peers[peer_hash]['Peer_Up_data']['local_address'] = msg.bmp_peer_up_local_address
-        self.peers[peer_hash]['Peer_Up_data']['local_port'] = msg.bmp_peer_up_local_port
-        self.peers[peer_hash]['Peer_Up_data']['remote_address'] =  msg.bmp_peer_up_remote_port
-        self.peers[peer_hash]['Peer_Up_data']['sent_open'] = msg.bmp_peer_up_sent_open
-        self.peers[peer_hash]['Peer_Up_data']['rcvd_open'] = msg.bmp_peer_up_rcvd_open
+        peer_up = {}
+        peer_up['local_address'] = ip_address(msg.bmp_peer_up_local_address)
+        peer_up['local_port'] = msg.bmp_peer_up_local_port
+        peer_up['remote_port'] =  msg.bmp_peer_up_remote_port
+        peer_up['sent_open'] = msg.bmp_peer_up_sent_open
+        peer_up['rcvd_open'] = msg.bmp_peer_up_rcvd_open
+        
+
         if hasattr(msg,'bmp_peer_up_information'):
-            self.peers[peer_hash]['Peer_Up_data']['information'] = msg.bmp_peer_up_information
+            peer_up['information'] = msg.bmp_peer_up_information
+
+        self.peers[peer_hash]['Peer_Up_data'] = peer_up
+
         print("BMP Peer Data")
-        print('local address %s:%d' % (ip_address(msg.bmp_peer_up_local_address), msg.bmp_peer_up_local_port))
-        print('remote address %s:%d' % (ip_address(msg.bmp_ppc_IP4_Peer_Address), msg.bmp_peer_up_remote_port))
+        print('local address %s:%d' % (peer_up['local_address'], peer_up['local_port']))
+        print('remote address %s:%d' % (self.peers[peer_hash]['remote_IPv4_address'], peer_up['remote_port']))
         print("BMP Peer Data - BGP OPEN Data - ## TODO ##")
 
     def update_peer(self,msg):
@@ -51,15 +56,18 @@ class BmpContext():
     def new_peer(self,msg):
         peer_hash = msg.bmp_ppc_fixed_hash
         assert peer_hash not in self.peers
-        self.peers[peer_hash] = {}
-        self.peers[peer_hash]['rib'] = BGPribdb.BGPribdb()
+        ph = {}
+        ph['name']     = self.name
+        ph['remote_IPv4_address'] = ip_address(msg.bmp_ppc_IP4_Peer_Address)
+        ph['remote_AS']           = msg.bmp_ppc_Peer_AS
+        ph['Peer_Type']           = msg.bmp_ppc_Peer_Type
+        ph['Peer_Flags']          = msg.bmp_ppc_Peer_Flags
+        ph['Peer_Distinguisher']  = msg.bmp_ppc_Peer_Distinguisher 
+        ph['Peer_BGPID']          = ip_address(msg.bmp_ppc_Peer_BGPID)
 
-        self.peers[peer_hash]['remote_address']     = msg.bmp_ppc_IP4_Peer_Address
-        self.peers[peer_hash]['remote_AS']          = msg.bmp_ppc_Peer_AS
-        self.peers[peer_hash]['Peer_Type']          = msg.bmp_ppc_Peer_Type
-        self.peers[peer_hash]['Peer_Flags']         = msg.bmp_ppc_Peer_Flags
-        self.peers[peer_hash]['Peer_Distinguisher'] = msg.bmp_ppc_Peer_Distinguisher 
-        self.peers[peer_hash]['Peer_BGPID']         = msg.bmp_ppc_Peer_BGPID
+        ph['rib'] = BGPribdb.BGPribdb(ph['name'], ph['remote_IPv4_address'], ph['remote_AS'], ph['Peer_BGPID'])
+
+        self.peers[peer_hash] = ph
 
         if msg.msg_type == bmpparse.BMP_Peer_Up_Notification:
             print("creating peer record from Peer Up Notification message")

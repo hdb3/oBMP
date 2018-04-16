@@ -10,7 +10,13 @@ import sys
 import hashlib
 
 class BGPribdb:
-    def __init__(self):
+    def __init__(self,src,remote_address,remote_AS,remote_BGPID):
+
+        self.src = src
+        self.remote_address = remote_address
+        self.remote_AS = remote_AS
+        self.remote_BGPID = remote_BGPID
+
         self.db_lock = threading.Lock()
         self.rib = {}
         self.path_attributes = {}
@@ -81,14 +87,15 @@ class BGPribdb:
 
 
         return \
-               "**BGPribdb state**\n" + \
-               "  rib size %d    " % len(self.rib) + \
-               "  paths in rib %d\n" % len(self.path_attributes) + \
-               "  *refresh queue * paths / prefixes = %d/%d\n" % ( cnt_refresh_paths,cnt_refresh_prefixes) + \
-               "  *historic view* prefixes rcvd / unique prefixes rcvd = %d/%d\n" % ( cnt_all_prefixes_rcvd,cnt_all_unique_prefixes_rcvd) + \
-               "  *historic view* prefixes withd / unique prefixes withd = %d/%d\n" % ( cnt_all_prefixes_withdrawn,cnt_all_unique_prefixes_withdrawn) + \
-               "  *global view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (pa_hashes_in_update,prefixes_in_update,prefixes_in_withdraw) + \
-               "  *path view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (path_pa_hashes_in_update,path_prefixes_in_update,path_prefixes_in_withdraw)
+               "-- ID:%s" % self.src + "  **  BGPribdb state  **\n" + \
+               "-- ID:%s" % self.src + "  Remote Peer: AS %d ID:%s addr:%s\n" % (self.remote_AS,self.remote_BGPID,self.remote_address) + \
+               "-- ID:%s" % self.src + "  rib size %d    " % len(self.rib) + \
+                                       "  paths in rib %d\n" % len(self.path_attributes) + \
+               "-- ID:%s" % self.src + "  *refresh queue * paths / prefixes = %d/%d\n" % ( cnt_refresh_paths,cnt_refresh_prefixes) + \
+               "-- ID:%s" % self.src + "  *historic view* prefixes rcvd / unique prefixes rcvd = %d/%d\n" % ( cnt_all_prefixes_rcvd,cnt_all_unique_prefixes_rcvd) + \
+               "-- ID:%s" % self.src + "  *historic view* prefixes withd / unique prefixes withd = %d/%d\n" % ( cnt_all_prefixes_withdrawn,cnt_all_unique_prefixes_withdrawn) + \
+               "-- ID:%s" % self.src + "  *global view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (pa_hashes_in_update,prefixes_in_update,prefixes_in_withdraw) + \
+               "-- ID:%s" % self.src + "  *path view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (path_pa_hashes_in_update,path_prefixes_in_update,path_prefixes_in_withdraw)
 
     def lock(self):
         self.db_lock.acquire()
