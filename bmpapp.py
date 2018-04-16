@@ -39,6 +39,10 @@ class BmpContext():
         self.peers[peer_hash]['Peer_Up_data']['rcvd_open'] = msg.bmp_peer_up_rcvd_open
         if hasattr(msg,'bmp_peer_up_information'):
             self.peers[peer_hash]['Peer_Up_data']['information'] = msg.bmp_peer_up_information
+        print("BMP Peer Data")
+        print('local address %s:%d' % (ip_address(msg.bmp_peer_up_local_address), msg.bmp_peer_up_local_port))
+        print('remote address %s:%d' % (ip_address(msg.bmp_ppc_IP4_Peer_Address), msg.bmp_peer_up_remote_port))
+        print("BMP Peer Data - BGP OPEN Data - ## TODO ##")
 
     def update_peer(self,msg):
         print("updating peer record from Peer Up Notification message")
@@ -50,7 +54,7 @@ class BmpContext():
         self.peers[peer_hash] = {}
         self.peers[peer_hash]['rib'] = BGPribdb.BGPribdb()
 
-        self.peers[peer_hash]['remote_address']     = msg.bmp_ppc_Peer_Address
+        self.peers[peer_hash]['remote_address']     = msg.bmp_ppc_IP4_Peer_Address
         self.peers[peer_hash]['remote_AS']          = msg.bmp_ppc_Peer_AS
         self.peers[peer_hash]['Peer_Type']          = msg.bmp_ppc_Peer_Type
         self.peers[peer_hash]['Peer_Flags']         = msg.bmp_ppc_Peer_Flags
@@ -76,14 +80,14 @@ class BmpContext():
             if new_peer_flag:
                 self.new_peer(msg)
                 print("-- ID:%s - new peer recognised" % self.name)
-                print("-- ID:%s - new BMP peer: local endpoint %s:%d" % (self.name,ip_address(msg.bmp_peer_up_local_address), msg.bmp_peer_up_local_port))
-                print("-- ID:%s - new BMP peer: remote endpoint %s:%d" % (self.name,ip_address(msg.bmp_ppc_Peer_Address), msg.bmp_peer_up_remote_port))
+                print("-- ID:%s - new BMP peer: remote address %s" % (self.name,ip_address(msg.bmp_ppc_IP4_Peer_Address)))
                 print("-- ID:%s - new BMP peer: remote AS %d" % (self.name,msg.bmp_ppc_Peer_AS))
+                print("-- ID:%s - new BMP peer: peer BGPID %s" % (self.name,ip_address(msg.bmp_ppc_Peer_BGPID)))
 
             if msg.msg_type == bmpparse.BMP_Peer_Up_Notification:
                 peer_up_received = ('Peer_Up_data' in self.peers[peer_hash])
 
-                print("-- ID:%s - BMP Peer Up rcvd - AS%d at %s:%d" % (self.name,msg.bmp_ppc_Peer_AS,ip_address(msg.bmp_ppc_Peer_Address), msg.bmp_peer_up_remote_port))
+                print("-- ID:%s - BMP Peer Up rcvd - AS%d at %s:%d" % (self.name,msg.bmp_ppc_Peer_AS,ip_address(msg.bmp_ppc_IP4_Peer_Address), msg.bmp_peer_up_remote_port))
 
                 if new_peer_flag:
                     print("-- ID:%s - BMP Peer Up rcvd for new peer" % self.name)
