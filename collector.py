@@ -45,8 +45,8 @@ class Session():
         r=1
         parser = bmpapp.BmpContext(self.name)
         buf = bytearray()
-        while True:
-            msg = self.recv()
+        msg = self.recv()
+        while msg:
             r += 1
             buf.extend(msg)
             #filebuffer,bmp_msg = bmpparse.BMP_message.get_next_parsed(filebuffer)
@@ -56,6 +56,7 @@ class Session():
                 parser.parse(bmpparse.BMP_message(bmp_msg))
                 n += 1
                 buf,bmp_msg = bmpparse.BMP_message.get_next(buf)
+            msg = self.recv()
         print("%d messages processed" % n)
         print("%d blocks read" % r)
         print(parser.rib)
