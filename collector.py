@@ -13,10 +13,6 @@ import socket
 import threading
 from time import sleep
 import pprint
-import bgpparse
-import bmpparse
-import BGPribdb
-import bmpblkparse
 
 def log(c):
     sys.stderr.write(c)
