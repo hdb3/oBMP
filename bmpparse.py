@@ -130,7 +130,8 @@ class BMP_message:
             self.bmp_ppc_Peer_Flags = struct.unpack_from('!B', msg, offset=7)[0]              # 1 byte index 7
             self.bmp_ppc_Peer_Distinguisher  = struct.unpack_from('!Q', msg, offset=8)[0]     # 8 bytes index 8
             # 16 byte field to accomodate IPv6, however I assume IPv4 here!
-            self.bmp_ppc_Peer_Address = struct.unpack_from('!I', msg, offset=16)[0]           # 16 bytes index 16
+            self.bmp_ppc_IP6_Peer_Address = struct.unpack_from('!QQ', msg, offset=16)[0]           # 16 bytes index 16
+            self.bmp_ppc_IP4_Peer_Address = struct.unpack_from('!I', msg, offset=28)[0]           # 16 bytes index 16
             self.bmp_ppc_Peer_AS = struct.unpack_from('!I', msg, offset=32)[0]                # 4 bytes index 32
             self.bmp_ppc_Peer_BGPID = struct.unpack_from('!I', msg, offset=36)[0]             # 4 bytes index 36
             self.bmp_ppc_Timestamp_Seconds = struct.unpack_from('!I', msg, offset=40)[0]      # 4 bytes index 40
