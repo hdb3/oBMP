@@ -24,3 +24,4 @@ class BGP_capability_codes(IntEnum):
 
 AFI_IPv4 = 1
 SAFI_Unicast = 1
+valid_codes = set(BGP_capability_codes.__members__.values())

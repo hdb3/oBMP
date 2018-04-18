@@ -1,6 +1,6 @@
 
 import struct
-from capabilitycodes import BGP_capability_codes
+from capabilitycodes import BGP_capability_codes,valid_codes
 cc = BGP_capability_codes
 
 class Capability:    
@@ -31,9 +31,9 @@ class Capability:
             assert isinstance(value[0],bool)
             assert isinstance(value[1],int)
             if value[0]:
-                v.extend( struct.pack('!H', value[0])) # timer value
+                v.extend( struct.pack('!H', 0x8000 | value[1])) # timer value with restart flag set
             else:
-                v.extend( struct.pack('!H', 0x8000 | value[0])) # timer value with restart flag set
+                v.extend( struct.pack('!H', value[1])) # timer value
 
         elif code == cc.AS4:
             assert isinstance(value,int)
@@ -77,23 +77,22 @@ class Capability:
             v = struct.unpack_from('!I', msg, offset=2)[0]
 
         else:
-            assert value is None
             v = None
 
-        return (t,v)
+        return (code,v)
 
     @staticmethod
     def display_cap(tpl):
-        (c,v) = tpl
-        assert t in valid_codes
+        (code,val) = tpl
+        assert code in valid_codes
 
-        s = c.name()
+        s = code.name
 
         if code == cc.multiprotocol:
-            s += " AFI:%d SAFI:%d" % (v[0],v[1])
+            s += " AFI:%d SAFI:%d" % (val[0],val[1])
 
         elif code == cc.graceful_restart:
-            (restart_flag,timer_value) = v
+            (restart_flag,timer_value) = val
             if restart_flag:
                 fls = "True"
             else:
@@ -102,8 +101,8 @@ class Capability:
             s += " restart flag:%s timer:%d" % (fls,timer_value)
 
         elif code == cc.AS4:
-            s += " AS4:%d" % value
+            s += " AS%d" % val
         else:
-            assert value is None
+            assert val is None
 
         return s
