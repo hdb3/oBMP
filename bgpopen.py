@@ -56,6 +56,7 @@ class BGP_OPEN_message:
         self.bgp_id = IPv4Address(struct.unpack_from('!I', msg, offset=5)[0])
         parameter_length = struct.unpack_from('!B', msg, offset=9)[0]
         self.optional_parameters = self.tlv_parse(msg[10:10+parameter_length])
+        return self
 
     @staticmethod
     def deparse_parameters(optional_parameters):

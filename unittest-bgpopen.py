@@ -31,4 +31,9 @@ def main():
     raw_msg = msg.deparse()
     print(raw_msg.hex())
 
+    parsed_message = bgpopen.BGP_OPEN_message.parse(raw_msg)
+
+    print("parsed message is :")
+    print(parsed_message)
+
 main()

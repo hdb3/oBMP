@@ -12,7 +12,6 @@ import sys
 import socket
 import threading
 from time import sleep
-import pprint
 
 def log(c):
     sys.stderr.write(c)
@@ -34,7 +33,34 @@ class Session():
             getattr(self,name)()
         else:
             self.run()
-
+    
+    def router(self):
+        import bgppeel
+        import bgpmsg
+        import bgpopen
+        log("Session.router(%s) starting\n" % self.name)
+        n=0
+        r=1
+        buf = bytearray()
+        msg = self.recv()
+        while msg:
+            r += 1
+            buf.extend(msg)
+            msg_type,msg,buf = bgppeel.peel(buf)
+            while msg:
+                if msg_type == bgpmsg.BGP_OPEN:
+                    print("BGP OPEN rcvd")
+                    parsed_open_msg = bgpopen.BGP_OPEN_message.parse(msg[19:])
+                    print(parsed_open_msg)
+                else:
+                    print("BGP cwmsg type %d rcvd" % msg_type)
+                n += 1
+                msg_type,msg,buf = bgppeel.peel(buf)
+            msg = self.recv()
+        print("%d messages processed" % n)
+        print("%d blocks read" % r)
+        log("Session.router(%s) exiting\n" % self.name)
+    
     def bmpd(self):
         import bmpparse
         import bmpapp
