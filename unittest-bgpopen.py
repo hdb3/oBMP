@@ -22,10 +22,10 @@ def main():
     caps = []
     caps.append( (cc.route_refresh, None) )
     caps.append( (cc.multiprotocol,(AFI_IPv4,SAFI_Unicast)) )
-    caps.append( (cc.AS4,64502) )
+    caps.append( (cc.AS4,64505) )
     caps.append( (cc.graceful_restart,(False,1000)) )
 
-    msg = bgpopen.BGP_OPEN_message.new(64502,60,IPv4Address('192.168.0.1'),caps)
+    msg = bgpopen.BGP_OPEN_message.new(64505,60,IPv4Address('10.30.65.209'),caps)
 
     print(msg)
     raw_msg = msg.deparse()

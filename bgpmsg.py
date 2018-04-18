@@ -78,6 +78,17 @@ class BGP_message:
 
 
     @staticmethod
+    def deparse(msg_type,msg):
+        assert msg_type > 0 and msg_type < 5, "Invalid BGP message type %d" % msg_type
+        raw_msg = bytearray()
+        raw_msg.extend(BGP_marker)
+        raw_msg.extend(struct.pack('!H',len(msg)))
+        raw_msg.extend(struct.pack('!B',msg_type))
+        raw_msg.extend(msg)
+        return raw_msg
+
+
+    @staticmethod
     def inner_tlv_parse(msg):
         c_type   = struct.unpack_from('!B', msg, offset=0)[0]
         c_length = struct.unpack_from('!B', msg, offset=1)[0]

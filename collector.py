@@ -34,6 +34,24 @@ class Session():
         else:
             self.run()
     
+    @staticmethod
+    def make_open_msg():
+
+
+        from bgpopen import BGP_OPEN_message
+        from bgpmsg import BGP_message,BGP_OPEN
+        from ipaddress import IPv4Address
+        from capabilitycodes import BGP_capability_codes,AFI_IPv4,SAFI_Unicast
+
+        caps = [ (BGP_capability_codes.route_refresh, None) ]
+        _caps = [ (BGP_capability_codes.route_refresh, None), \
+                 (BGP_capability_codes.multiprotocol,(AFI_IPv4,SAFI_Unicast)), \
+                 (BGP_capability_codes.AS4,64505), \
+                 (BGP_capability_codes.graceful_restart,(False,1000)) ]
+        open_msg =  BGP_OPEN_message.new(64505,60,IPv4Address('10.30.65.209'), caps)
+        return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
+
+
     def router(self):
         import bgppeel
         import bgpmsg
@@ -46,16 +64,17 @@ class Session():
         while msg:
             r += 1
             buf.extend(msg)
-            msg_type,msg,buf = bgppeel.peel(buf)
-            while msg:
+            msg_type,bgp_msg,buf = bgppeel.peel(buf)
+            while bgp_msg:
                 if msg_type == bgpmsg.BGP_OPEN:
                     print("BGP OPEN rcvd")
-                    parsed_open_msg = bgpopen.BGP_OPEN_message.parse(msg[19:])
+                    parsed_open_msg = bgpopen.BGP_OPEN_message.parse(bgp_msg[19:])
                     print(parsed_open_msg)
+                    self.send(self.make_open_msg())
                 else:
-                    print("BGP cwmsg type %d rcvd" % msg_type)
+                    print("BGP msg type %d rcvd" % msg_type)
                 n += 1
-                msg_type,msg,buf = bgppeel.peel(buf)
+                msg_type,bgp_msg,buf = bgppeel.peel(buf)
             msg = self.recv()
         print("%d messages processed" % n)
         print("%d blocks read" % r)
