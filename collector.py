@@ -39,12 +39,12 @@ class Session():
 
 
         from bgpopen import BGP_OPEN_message
-        from bgpmsg import BGP_message,BGP_OPEN
+        from bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE
         from ipaddress import IPv4Address
         from capabilitycodes import BGP_capability_codes,AFI_IPv4,SAFI_Unicast
 
-        caps = [ (BGP_capability_codes.route_refresh, None) ]
-        _caps = [ (BGP_capability_codes.route_refresh, None), \
+        _caps = [ (BGP_capability_codes.route_refresh, None) ]
+        caps = [ (BGP_capability_codes.route_refresh, None), \
                  (BGP_capability_codes.multiprotocol,(AFI_IPv4,SAFI_Unicast)), \
                  (BGP_capability_codes.AS4,64505), \
                  (BGP_capability_codes.graceful_restart,(False,1000)) ]
@@ -54,8 +54,8 @@ class Session():
 
     def router(self):
         import bgppeel
-        import bgpmsg
-        import bgpopen
+        from bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE,BGP_UPDATE,BGP_NOTIFICATION
+        from bgpopen import BGP_OPEN_message
         log("Session.router(%s) starting\n" % self.name)
         n=0
         r=1
@@ -66,11 +66,19 @@ class Session():
             buf.extend(msg)
             msg_type,bgp_msg,buf = bgppeel.peel(buf)
             while bgp_msg:
-                if msg_type == bgpmsg.BGP_OPEN:
+                if msg_type == BGP_KEEPALIVE:
+                    print("BGP KEEPALIVE rcvd")
+                    self.send(BGP_message.keepalive())
+                elif msg_type == BGP_NOTIFICATION:
+                    print("BGP NOTIFY rcvd")
+                elif msg_type == BGP_UPDATE:
+                    print("BGP UPDATE rcvd")
+                elif msg_type == BGP_OPEN:
                     print("BGP OPEN rcvd")
-                    parsed_open_msg = bgpopen.BGP_OPEN_message.parse(bgp_msg[19:])
+                    parsed_open_msg = BGP_OPEN_message.parse(bgp_msg[19:])
                     print(parsed_open_msg)
                     self.send(self.make_open_msg())
+                    self.send(BGP_message.keepalive())
                 else:
                     print("BGP msg type %d rcvd" % msg_type)
                 n += 1

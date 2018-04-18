@@ -82,11 +82,14 @@ class BGP_message:
         assert msg_type > 0 and msg_type < 5, "Invalid BGP message type %d" % msg_type
         raw_msg = bytearray()
         raw_msg.extend(BGP_marker)
-        raw_msg.extend(struct.pack('!H',len(msg)))
+        raw_msg.extend(struct.pack('!H',19+len(msg)))
         raw_msg.extend(struct.pack('!B',msg_type))
         raw_msg.extend(msg)
         return raw_msg
 
+    @classmethod
+    def keepalive(cls):
+        return cls.deparse(BGP_KEEPALIVE,bytearray())
 
     @staticmethod
     def inner_tlv_parse(msg):
