@@ -86,9 +86,14 @@ class Session():
                 elif msg_type == BGP_UPDATE:
                     u += 1
                     debug("BGP UPDATE rcvd %d" % u)
+                    parsed_update_msg = BGP_UPDATE_message.parse(bgp_payload)
+                    if parsed_update_msg.end_of_rib:
+                        debug("\nBGP UPDATE END_OF_RIB rcvd\n")
+                    if parsed_update_msg.except_flag:
+                        print(parsed_update_msg)
                 elif msg_type == BGP_OPEN:
                     debug("\nBGP OPEN rcvd\n")
-                    parsed_open_msg = BGP_OPEN_message.parse(bgp_msg[19:])
+                    parsed_open_msg = BGP_OPEN_message.parse(bgp_payload)
                     print(parsed_open_msg)
                     self.send(BGP_message.keepalive())
                     if not active:

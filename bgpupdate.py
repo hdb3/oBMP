@@ -12,6 +12,13 @@ import traceback
 import struct
 #from ipaddress import IPv4Address
 
+logfile=sys.stderr
+def eprint(s):
+    logfile.write(s+'\n')
+    logfile.flush()
+    return
+
+
 # for unknown attributes use https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml
 # or dump into wireshark!
 
@@ -38,6 +45,15 @@ BGP_Attribute_Flags_Partial = 0x20 # 1 << 5
 BGP_Attribute_Flags_Extended_Length = 0x10 # 1 << 4
 
 class BGP_UPDATE_message:
+
+    def __init__(self):
+        self.except_flag = False
+        self.unhandled_codes = []
+        self.attribute = {}
+
+    def __str__(self):
+        from pprint import pformat
+        return str(pformat(vars(self)))
 
     def deparse(self):
         msg = bytearray()
@@ -66,6 +82,9 @@ class BGP_UPDATE_message:
         assert lm > withdrawn_routes_length + 3 + path_attribute_length
         self.process_NLRI(msg[ withdrawn_routes_length + 4 + path_attribute_length:])
         self.process_path_attributes(msg[withdrawn_routes_length + 4 : withdrawn_routes_length + 4 + path_attribute_length])
+        self.end_of_rib = ( 0 == len(self.withdrawn_prefixes)) \
+                      and ( 0 == len(self.prefixes)) \
+                      and ( 0 == len(self.attribute))
         return self
 
     def process_withdrawn_routes(self,prefix_list):
