@@ -18,6 +18,15 @@ def eprint(s):
     logfile.flush()
     return
 
+def b(x):
+    return bytearray([x])
+
+def w(x):
+    return struct.pack('!H',x)
+
+def l(x):
+    return struct.pack('!I',x)
+
 
 # for unknown attributes use https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml
 # or dump into wireshark!
@@ -44,6 +53,43 @@ BGP_Attribute_Flags_Transitive = 0x40 # 1 << 6
 BGP_Attribute_Flags_Partial = 0x20 # 1 << 5
 BGP_Attribute_Flags_Extended_Length = 0x10 # 1 << 4
 
+attribute_flags = dict([
+    (BGP_TYPE_CODE_ORIGIN, BGP_Attribute_Flags_Transitive), \
+    (BGP_TYPE_CODE_AS_PATH, BGP_Attribute_Flags_Transitive), \
+    (BGP_TYPE_CODE_NEXT_HOP, BGP_Attribute_Flags_Transitive), \
+    (BGP_TYPE_CODE_MULTI_EXIT_DISC, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_LOCAL_PREF, BGP_Attribute_Flags_Transitive), \
+    (BGP_TYPE_CODE_ATOMIC_AGGREGATE, BGP_Attribute_Flags_Transitive), \
+    (BGP_TYPE_CODE_AGGREGATOR, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_COMMUNITIES, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_MP_REACH_NLRI, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_MP_UNREACH_NLRI, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_EXTENDED_COMMUNITIES, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_AS4_PATH, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_AS4_AGGREGATOR, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_CONNECTOR, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_AS_PATHLIMIT, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_LARGE_COMMUNITY, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_ATTR_SET, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional)
+])
+
+def get_flags(code):
+    return attribute_flags[code]
+
+def show_flags(flags):
+    if bool(flags & BGP_Attribute_Flags_Optional):
+        s = 'O'
+    else:
+        s = 'o'
+    if bool(flags & BGP_Attribute_Flags_Transitive):
+        return s + 'T'
+    else:
+        return s + 't'
+
+def check_flags(code,flags):
+    assert (flags & (BGP_Attribute_Flags_Optional | BGP_Attribute_Flags_Transitive) ) == attribute_flags[code] , \
+        "flag check failed for attribute %d, flags %s:%s" % (code, show_flags(flags), show_flags(attribute_flags[code]))
+
 class BGP_UPDATE_message:
 
     def __init__(self):
@@ -51,6 +97,14 @@ class BGP_UPDATE_message:
         self.as4_flag = None
         self.unhandled_codes = []
         self.path_attributes = {}
+        self.partial_flags = {}
+
+    def as4_check(self,as4_flag):
+        if self.as4_flag is None:
+            self.as4_flag = as4_flag
+        else:
+            assert self.as4_flag == as4_flag
+
 
     def __str__(self):
         from pprint import pformat
@@ -66,7 +120,6 @@ class BGP_UPDATE_message:
     def eprint(s):
         sys.stderr.write(s+'\n')
         sys.stderr.flush()
-
 
     @classmethod
     def parse(cls,msg):
@@ -138,6 +191,10 @@ class BGP_UPDATE_message:
         while offset < attributes_len:
             attr_flags = struct.unpack_from('!B', attributes, offset=offset)[0]
             attr_type_code = struct.unpack_from('!B', attributes, offset=offset+1)[0]
+
+            check_flags(attr_type_code,attr_flags)
+            if attr_flags & BGP_Attribute_Flags_Partial:
+                self.partial_flags[attr_type_code] = None
 
             extended_length = bool(attr_flags & BGP_Attribute_Flags_Extended_Length)
             if extended_length:
@@ -214,7 +271,7 @@ class BGP_UPDATE_message:
         community_list = []
         offset = 0
         while offset < len(attr):
-            community_list.append(struct.unpack_from('!III', attr, offset=offset)[0])
+            community_list.append(attr[offset:offset+12])
             offset += 12
 
         self.path_attributes[code] = community_list
@@ -301,11 +358,14 @@ class BGP_UPDATE_message:
         segments = []
         try:
             segments = get_segments(attr,True)
+            self.as4_check(True)
         except AssertionError as ae:
             try:
                 segments = get_segments(attr,False)
+                self.as4_check(False)
             except AssertionError as ae:
                 eprint("could not read AS path as AS2 or AS4")
+
 
         if segments:
             self.path_attributes[code] = segments
@@ -313,8 +373,10 @@ class BGP_UPDATE_message:
     def parse_attribute_aggregator(self,code,attr):
     # depending on AS4 nature this is either 8 bytes or 6 bytes
             if len(attr) == 8:
+                self.as4_check(True)
                 self.parse_attribute_4b_4b(code,attr)
             elif len(attr) == 6:
+                self.as4_check(False)
                 self.parse_attribute_2b_4b(code,attr)
             else:
                 assert len(attr) == 6 or len(attr) == 8
@@ -337,7 +399,7 @@ class BGP_UPDATE_message:
 
     def parse_attribute_0_length(self,code,attr):
         assert len(attr) == 0
-        self.path_attributes[code] = True
+        self.path_attributes[code] = None
 
     def parse_attribute_unhandled(self,code,attr):
             self.path_attributes[code] = attr
@@ -407,55 +469,69 @@ class BGP_UPDATE_message:
 
         def encode_attribute(code,flags,attribute):
 
-            msg = bytearry(code)
-            if len(attribute) > 255:
-                msg.extend(flags | BGP_Attribute_Flags_Extended_Length)
-                msg.extend(code)
-                msg.extend(struct.pack('!H',len(attribute)))
-            else:
-                msg.extend(flags)
-                msg.extend(code)
-                msg.extend(len(attribute))
-            msg.extend(attribute)
+            msg = b(code)
+            if attribute is not None:
+                if len(attribute) > 255:
+                    msg.extend(b(flags | BGP_Attribute_Flags_Extended_Length))
+                    msg.extend(b(code))
+                    msg.extend(w(len(attribute)))
+                else:
+                    msg.extend(b(flags))
+                    msg.extend(b(code))
+                    msg.extend(b(len(attribute)))
+                msg.extend(attribute)
+            return msg
 
         def deparse_communities(code,attr):
 
-            msg = bytearray(code)
+            msg = b(code)
             for community in attr:
-                msg.extend(struct.pack('!HH',community))
+                msg.extend(l(community))
 
             return msg
 
         def deparse_attribute_set(code,attr):
 
-            return bytearray(code).extend(struct.pack('!I',attr[0])).extend(attr[1])
+            msg = b(code)
+            msg.extend(l(attr[0]))
+            msg.extend(attr[1])
+            return msg
 
         def deparse_extended_communities(code,attr):
 
-            msg = bytearray(code)
+            msg = b(code)
             for ec1,ec2 in attr:
-                msg.extend(struct.pack('!H',ec1)).extend(ec2)
+                msg.extend(w(ec1))
+                msg.extend(ec2)
 
             return msg
 
         def deparse_large_community(code,attr):
 
-            msg = bytearray(code)
+            msg = b(code)
             for large_community in attr:
-                msg.extend(struct.pack('!III',large_community))
+                assert 12 == len(large_community)
+                msg.extend(large_community)
 
             return msg
 
         def deparse_as_pathlimit(code,attr):
-            return bytearray(code).extend(attr[0]).extend(struct.pack('!I',attr[1]))
+            msg = b(code)
+            msg.extend(b(attr[0]))
+            msg.extend(l(attr[1]))
+            return msg
 
         def deparse_connector(code,attr):
             # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
 
-            return bytearray(code).extend(attr)
+            msg = b(code)
+            msg.extend(attr)
+            return msg
 
         def deparse_unhandled(code,attr):
-            return bytearray(code).extend(attr)
+            msg = b(code)
+            msg.extend(attr)
+            return msg
 
 
         # an AS path attribute has 1 or more AS segments
@@ -466,16 +542,16 @@ class BGP_UPDATE_message:
 
         def deparse_AS_path(code,attr,as4):
 
-            msg = bytearray(code)
+            msg = b(code)
 
             for segment_type,as_list in attr:
-                msg.extend(segment_type)
-                msg.extend(len(as_list))
+                msg.extend(b(segment_type))
+                msg.extend(b(len(as_list)))
                 for AS in as_list:
                     if as4:
-                        msg.extend(struct.pack('!I',AS))
+                        msg.extend(l(AS))
                     else:
-                        msg.extend(struct.pack('!H',AS))
+                        msg.extend(w(AS))
             return msg
 
 
@@ -488,27 +564,30 @@ class BGP_UPDATE_message:
                 return deparse_2b_4b(code,attr)
 
         def deparse_4b_4b(code,attr):
-            return bytearray(code).extend(struct.pack('!I', attr[0])).extend(struct.pack('!I', attr[1]))
+            msg = b(code)
+            msg.extend(l(attr[0]))
+            msg.extend(l(attr[1]))
+            return msg
 
         def deparse_2b_4b(code,attr):
-            return bytearray(code).extend(struct.pack('!H', attr[0])).extend(struct.pack('!I', attr[1]))
+            return b(code).extend(w( attr[0])).extend(l( attr[1]))
 
         def deparse_32bits(code,attr):
-            return bytearray(code).extend(struct.pack('!I', attr))
+            return b(code).extend(l( attr))
 
         def deparse_8bits(code,attr):
-                return bytearray(code).extend(attr)
+                return b(code).extend(b(attr))
 
         def deparse_0_length(code,attr):
             assert attr is None
-            return bytearray(code)
+            return b(code)
 
         def deparse_path_attribute(code,attr):
             if (code==BGP_TYPE_CODE_ORIGIN):
                 return deparse_8bits(code,attr)
 
             elif (code==BGP_TYPE_CODE_AS_PATH):
-                return deparse_AS_path(code,attr)
+                return deparse_AS_path(code,attr,self.as4_flag)
 
             elif (code==BGP_TYPE_CODE_NEXT_HOP):
                 return deparse_32bits(code,attr)
@@ -523,7 +602,7 @@ class BGP_UPDATE_message:
                 return deparse_0_length(code,attr)
 
             elif (code==BGP_TYPE_CODE_AGGREGATOR):
-                return deparse_aggregator(code,attr)
+                return deparse_aggregator(code,attr,self.as4_flag)
 
             elif (code==BGP_TYPE_CODE_COMMUNITIES):
                 return deparse_communities(code,attr)
@@ -532,7 +611,7 @@ class BGP_UPDATE_message:
                 return deparse_extended_communities(code,attr)
 
             elif (code==BGP_TYPE_CODE_AS4_PATH):
-                return deparse_AS_path(code,attr,as4=self.as4_flag)
+                return deparse_AS_path(code,attr,self.as4_flag)
 
             elif (code==BGP_TYPE_CODE_AS4_AGGREGATOR):
                 return deparse_4b_4b(code,attr)
@@ -556,43 +635,46 @@ class BGP_UPDATE_message:
                 assert False , "Unknown BGP path attribute type %d" % code
 
 
-            msg = bytearray()
-            for code,attr in self.path_attributes:
-                msg.extend(encode(deparse_path_attributes(code,attr)))
-            return msg
-
-    def deparse_prefixes(prefix_list):
-
         msg = bytearray()
-        for prefix_length, prefix in prefix_list:
-            msg.extend(prefix_length)
-            prefix_bytearray = struct.pack('!I',prefix)
-            if prefix_length > 24:
-                msg.extend(prefix_bytearray)
-            elif prefix_length > 16:
-                msg.extend(prefix_bytearray[:3])
-            elif prefix_length > 8:
-                msg.extend(prefix_bytearray[:2])
-            elif prefix_length > 0:
-                msg.extend(prefix_bytearray[:1])
-            else:
-                pass
-
+        for code,attr in self.path_attributes.items():
+            flags = get_flags(code)
+            if code in self.partial_flags:
+                flags |= BGP_Attribute_Flags_Partial
+            msg.extend(encode_attribute(code,flags,deparse_path_attribute(code,attr)))
         return msg
 
     def deparse(self):
 
+        def deparse_prefixes(prefix_list):
+
+            msg = bytearray()
+            for prefix_length, prefix in prefix_list:
+                msg.extend(b(prefix_length))
+                prefix_bytearray = l(prefix)
+                if prefix_length > 24:
+                    msg.extend(prefix_bytearray)
+                elif prefix_length > 16:
+                    msg.extend(prefix_bytearray[:3])
+                elif prefix_length > 8:
+                    msg.extend(prefix_bytearray[:2])
+                elif prefix_length > 0:
+                    msg.extend(prefix_bytearray[:1])
+                else:
+                    pass
+
+            return msg
+
         msg = bytearray()
 
-        withdrawn_routes = self.deparse_prefixes(self.withdrawn_prefixes)
-        msg.extend(struct.pack('!H',len(withdrawn_routes)))
+        withdrawn_routes = deparse_prefixes(self.withdrawn_prefixes)
+        msg.extend(w(len(withdrawn_routes)))
         msg.extend(withdrawn_routes)
 
         path_attributes = self.deparse_path_attributes()
-        msg.extend(struct.pack('!H',len(path_attributes)))
+        msg.extend(w(len(path_attributes)))
         msg.extend(path_attributes)
 
-        msg.extend(self.deparse_prefixes(self.prefixes))
+        msg.extend(deparse_prefixes(self.prefixes))
 
         return msg
 

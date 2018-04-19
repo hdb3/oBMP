@@ -98,10 +98,14 @@ class Session():
                     else:
                         adjrib.update(update.path_attributes,update.prefixes)
                         adjrib.withdraw(update.withdrawn_prefixes)
+                        deparsed_update = update.deparse()
+                        print ("len original is %d len recoded msg is %d" % (len(bgp_payload), len(deparsed_update)))
                 elif msg_type == BGP_OPEN:
                     debug("\nBGP OPEN rcvd\n")
                     parsed_open_msg = BGP_OPEN_message.parse(bgp_payload)
                     print(parsed_open_msg)
+                    deparsed_open_msg = parsed_open_msg.deparse()
+                    print ("len original is %d len recoded msg is %d" % (len(bgp_payload), len(deparsed_open_msg)))
                     adjrib = BGPribdb(self.name, IPv4Address(self.remote_address[0]), parsed_open_msg.AS, parsed_open_msg.bgp_id)
                     self.send(BGP_message.keepalive())
                     if not active:
