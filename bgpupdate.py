@@ -49,7 +49,7 @@ class BGP_UPDATE_message:
     def __init__(self):
         self.except_flag = False
         self.unhandled_codes = []
-        self.attribute = {}
+        self.path_attributes = {}
 
     def __str__(self):
         from pprint import pformat
@@ -84,7 +84,7 @@ class BGP_UPDATE_message:
         self.process_path_attributes(msg[withdrawn_routes_length + 4 : withdrawn_routes_length + 4 + path_attribute_length])
         self.end_of_rib = ( 0 == len(self.withdrawn_prefixes)) \
                       and ( 0 == len(self.prefixes)) \
-                      and ( 0 == len(self.attribute))
+                      and ( 0 == len(self.path_attributes))
         return self
 
     def process_withdrawn_routes(self,prefix_list):
@@ -168,13 +168,13 @@ class BGP_UPDATE_message:
         
         if len(self.prefixes) > 0:
 
-            if BGP_TYPE_CODE_ORIGIN not in self.attribute:
+            if BGP_TYPE_CODE_ORIGIN not in self.path_attributes:
                 eprint("mandatory attribute BGP_TYPE_CODE_ORIGIN missing")
                 self.except_flag = True
-            if BGP_TYPE_CODE_AS_PATH not in self.attribute:
+            if BGP_TYPE_CODE_AS_PATH not in self.path_attributes:
                 eprint("mandatory attribute BGP_TYPE_CODE_AS_PATH missing")
                 self.except_flag = True
-            if BGP_TYPE_CODE_NEXT_HOP not in self.attribute:
+            if BGP_TYPE_CODE_NEXT_HOP not in self.path_attributes:
                 eprint("mandatory attribute BGP_TYPE_CODE_NEXT_HOP missing")
                 self.except_flag = True
         else:
@@ -191,13 +191,13 @@ class BGP_UPDATE_message:
             community_list.append(struct.unpack_from('!HH', attr, offset=offset)[0])
             offset += 4
 
-        self.attribute[code] = community_list
+        self.path_attributes[code] = community_list
 
     def parse_attribute_attribute_set(self,code,attr):
 
         assert 4 < len(attr), "BGP  attribute set length less than 4 (%d)" % len(attr)
 
-        self.attribute[code] = ((struct.unpack_from('!I', attr, offset=0)[0],attr[4:]))
+        self.path_attributes[code] = ((struct.unpack_from('!I', attr, offset=0)[0],attr[4:]))
 
     def parse_attribute_extended_communities(self,code,attr):
 
@@ -208,7 +208,7 @@ class BGP_UPDATE_message:
         for offset in range(0,len(attr),8):
             extended_community_list.append((struct.unpack_from('!H', attr, offset=offset)[0],attr[offset+2:offset+8]))
 
-        self.attribute[code] = extended_community_list
+        self.path_attributes[code] = extended_community_list
 
     def parse_attribute_large_community(self,code,attr):
 
@@ -220,18 +220,18 @@ class BGP_UPDATE_message:
             community_list.append(struct.unpack_from('!III', attr, offset=offset)[0])
             offset += 12
 
-        self.attribute[code] = community_list
+        self.path_attributes[code] = community_list
 
     def parse_attribute_as_pathlimit(self,code,attr):
             assert len(attr) == 5
-            self.attribute[code] = (struct.unpack_from('!B', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=1)[0])
-            ##eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.attribute[code]))
+            self.path_attributes[code] = (struct.unpack_from('!B', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=1)[0])
+            ##eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.path_attributes[code]))
 
     def parse_attribute_connector(self,code,attr):
         # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
 
             assert len(attr) >4
-            self.attribute[code] = attr
+            self.path_attributes[code] = attr
             ##eprint("parse_attribute_connector: value %s" % attr.hex())
 
 
@@ -311,7 +311,7 @@ class BGP_UPDATE_message:
                 eprint("could not read AS path as AS2 or AS4")
     
         if segments:
-            self.attribute[code] = segments
+            self.path_attributes[code] = segments
 
     def parse_attribute_aggregator(self,code,attr):
     # depending on AS4 nature this is either 8 bytes or 6 bytes
@@ -324,26 +324,26 @@ class BGP_UPDATE_message:
 
     def parse_attribute_4b_4b(self,code,attr):
             assert len(attr) == 8
-            self.attribute[code] = (struct.unpack_from('!I', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
+            self.path_attributes[code] = (struct.unpack_from('!I', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
 
     def parse_attribute_2b_4b(self,code,attr):
             assert len(attr) == 6
-            self.attribute[code] = (struct.unpack_from('!H', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
+            self.path_attributes[code] = (struct.unpack_from('!H', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=2)[0])
 
     def parse_attribute_32bits(self,code,attr):
             assert len(attr) == 4
-            self.attribute[code] = struct.unpack_from('!I', attr, offset=0)[0]
+            self.path_attributes[code] = struct.unpack_from('!I', attr, offset=0)[0]
 
     def parse_attribute_8bits(self,code,attr):
             assert len(attr) == 1
-            self.attribute[code] = struct.unpack_from('!B', attr, offset=0)[0]
+            self.path_attributes[code] = struct.unpack_from('!B', attr, offset=0)[0]
 
     def parse_attribute_0_length(self,code,attr):
         assert len(attr) == 0
-        self.attribute[code] = True
+        self.path_attributes[code] = True
 
     def parse_attribute_unhandled(self,code,attr):
-            self.attribute[code] = attr
+            self.path_attributes[code] = attr
             self.unhandled_codes.append(code)
 
     def parse_attribute(self,flags,code,attr):

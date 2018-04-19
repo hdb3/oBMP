@@ -96,7 +96,7 @@ class Session():
                         debug("\nBGP UPDATE END_OF_RIB rcvd\n")
                         print(adjrib)
                     else:
-                        adjrib.update(update.attribute,update.prefixes)
+                        adjrib.update(update.path_attributes,update.prefixes)
                         adjrib.withdraw(update.withdrawn_prefixes)
                 elif msg_type == BGP_OPEN:
                     debug("\nBGP OPEN rcvd\n")
