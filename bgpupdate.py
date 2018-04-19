@@ -12,23 +12,6 @@ import traceback
 import struct
 #from ipaddress import IPv4Address
 
-class BGP_UPDATE_message:
-
-    def deparse(self):
-        msg = bytearray()
-        return msg
-
-    @classmethod
-    def new(cls,AS,hold_time,bgp_id,capabilities):
-        self = cls()
-
-        return self
-
-
-def eprint(s):
-    sys.stderr.write(s+'\n')
-    sys.stderr.flush()
-
 # for unknown attributes use https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml
 # or dump into wireshark!
 
@@ -53,6 +36,23 @@ BGP_Attribute_Flags_Optional = 0x80 # 1 << 7
 BGP_Attribute_Flags_Transitive = 0x40 # 1 << 6
 BGP_Attribute_Flags_Partial = 0x20 # 1 << 5
 BGP_Attribute_Flags_Extended_Length = 0x10 # 1 << 4
+
+class BGP_UPDATE_message:
+
+    def deparse(self):
+        msg = bytearray()
+        return msg
+
+    @classmethod
+    def new(cls,AS,hold_time,bgp_id,capabilities):
+        self = cls()
+
+        return self
+
+
+    def eprint(s):
+        sys.stderr.write(s+'\n')
+        sys.stderr.flush()
 
 
     @classmethod

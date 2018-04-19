@@ -19,10 +19,14 @@ def log(c):
 
 class Session():
 
-    def __init__(self,app,name,send,recv):
+    def __init__(self,app,appconfig,name,send,recv):
+        self.appconfig = appconfig
         self.name = name
         self.recv = recv
         self.send = send
+
+        print("Session - appconfig:")
+        print(self.appconfig)
 
         if app:
             if hasattr(self,app):
@@ -47,22 +51,24 @@ class Session():
             sys.stderr.flush
 
 
-        def make_open_msg():
+        def make_open_msg(AS,bgpid):
             caps = [ (BGP_capability_codes.route_refresh, None), \
                      (BGP_capability_codes.multiprotocol,(AFI_IPv4,SAFI_Unicast)), \
-                     (BGP_capability_codes.AS4,64505), \
+                     (BGP_capability_codes.AS4,AS), \
                      (BGP_capability_codes.graceful_restart,(False,1000)) ]
-            open_msg =  BGP_OPEN_message.new(64505,60,IPv4Address('10.30.65.209'), caps)
+            open_msg =  BGP_OPEN_message.new(AS,60,IPv4Address(bgpid), caps)
     
             return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
     
         log("Session.router(%s) starting\n" % self.name)
+        active = self.appconfig['mode'] == 'active'
+        open_msg = make_open_msg(self.appconfig['AS'],self.appconfig['bgpid'])
         n=0
         r=1
         k=0
         u=0
-        self.send(self.make_open_msg())
-        self.send(BGP_message.keepalive())
+        if active:
+            self.send(open_msg)
         buf = bytearray()
         msg = self.recv()
         while msg:
@@ -76,7 +82,7 @@ class Session():
                     debug("\nBGP KEEPALIVE rcvd %d\n" % k)
                     self.send(BGP_message.keepalive())
                 elif msg_type == BGP_NOTIFICATION:
-                    debug("BGP NOTIFY rcvd")
+                    debug("\nBGP NOTIFY rcvd\n")
                 elif msg_type == BGP_UPDATE:
                     u += 1
                     debug("BGP UPDATE rcvd %d" % u)
@@ -84,8 +90,9 @@ class Session():
                     debug("\nBGP OPEN rcvd\n")
                     parsed_open_msg = BGP_OPEN_message.parse(bgp_msg[19:])
                     print(parsed_open_msg)
-                    # self.send(self.make_open_msg())
-                    # self.send(BGP_message.keepalive())
+                    self.send(BGP_message.keepalive())
+                    if not active:
+                        self.send(open_msg)
                 else:
                     debug("BGP msg type %d rcvd" % msg_type)
                 n += 1
@@ -189,13 +196,15 @@ def _name(address):
 
 class Collector(threading.Thread):
 
-    def __init__(self,app,name,host,port):
+    def __init__(self,app,appconfig,name,host,port):
+        self.appconfig = appconfig
         ## why not just use super????
         ## - -  well it doesn't work so don't....
         ##super().__init__(self,name=name,daemon=False)
         threading.Thread.__init__(self,name=name,daemon=False)
         self.state = Initialising
         self.app = app
+        self.appconfig = appconfig
         self.connections = 0
         self.event = threading.Event()
         self.address = (host,port)
@@ -299,7 +308,7 @@ class Listener(Collector):
                 self.state = Connected
                 self.connections += 1
                 self.log_err("connected to %s\n" % _name(remote_address))
-                session = Session(self.app,self.name,self.send,self.recv)
+                session = Session(self.app,self.appconfig,self.name,self.send,self.recv)
                 try:
                     self.sock.shutdown(socket.SHUT_RDWR)
                     self.sock.close()
@@ -342,7 +351,7 @@ class Talker(Collector):
                 self.connections += 1
                 self.log_err("connected to %s\n" % _name(self.address))
                 self.connections += 1
-                session = Session(self.app,self.name,self.send,self.recv)
+                session = Session(self.app,self.appconfig,self.name,self.send,self.recv)
                 self.sock.close()
                 self.sock.shutdown(socket.SHUT_RDWR)
             except (socket.error,socket.timeout) as e:
@@ -371,6 +380,11 @@ def main(name,config):
     if ('daemon' not in collector_cfg):
         sys.exit("could not find sub-section 'daemon' in config file")
 
+    if ('daemon-config' not in collector_cfg):
+        appconfig = None
+    else:
+        appconfig = collector_cfg['daemon-config']
+
     if ('listener' not in collector_cfg and 'targets' not in collector_cfg):
         sys.exit("could not find sub-section 'targets' or 'listener' in config file")
 
@@ -380,14 +394,14 @@ def main(name,config):
         for cfg_target in cfg_targets:
             assert 'host' in cfg_target
             assert 'port' in cfg_target
-            collectors.append(Talker(collector_cfg['daemon'],name,cfg_target['host'],cfg_target['port']))
+            collectors.append(Talker(collector_cfg['daemon'],appconfig,name,cfg_target['host'],cfg_target['port']))
 
     if ('listener' in collector_cfg):
         cfg_listener = collector_cfg['listener']
         ## TODO move this functionality into the listener code
         if '*' == cfg_listener['host']:
             cfg_listener['host'] = ''
-        collectors.append(Listener(collector_cfg['daemon'],name,cfg_listener['host'],cfg_listener['port']))
+        collectors.append(Listener(collector_cfg['daemon'],appconfig,name,cfg_listener['host'],cfg_listener['port']))
 
     for collector in collectors:
         collector.start()
