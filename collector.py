@@ -19,9 +19,10 @@ def log(c):
 
 class Session():
 
-    def __init__(self,app,appconfig,name,send,recv):
+    def __init__(self,app,appconfig,name,remote_address,send,recv):
         self.appconfig = appconfig
         self.name = name
+        self.remote_address = remote_address
         self.recv = recv
         self.send = send
 
@@ -45,6 +46,7 @@ class Session():
         from bgpupdate import BGP_UPDATE_message
         from ipaddress import IPv4Address
         from capabilitycodes import BGP_capability_codes,AFI_IPv4,SAFI_Unicast
+        from BGPribdb import BGPribdb
 
         def debug(s):
             sys.stderr.write(s+'\r')
@@ -86,15 +88,19 @@ class Session():
                 elif msg_type == BGP_UPDATE:
                     u += 1
                     debug("BGP UPDATE rcvd %d" % u)
-                    parsed_update_msg = BGP_UPDATE_message.parse(bgp_payload)
-                    if parsed_update_msg.end_of_rib:
+                    update = BGP_UPDATE_message.parse(bgp_payload)
+                    if update.except_flag:
+                        print(update)
+                    elif update.end_of_rib:
                         debug("\nBGP UPDATE END_OF_RIB rcvd\n")
-                    if parsed_update_msg.except_flag:
-                        print(parsed_update_msg)
+                    else:
+                        adjrib.update(update.attribute,update.prefixes)
+                        adjrib.withdraw(update.withdrawn_prefixes)
                 elif msg_type == BGP_OPEN:
                     debug("\nBGP OPEN rcvd\n")
                     parsed_open_msg = BGP_OPEN_message.parse(bgp_payload)
                     print(parsed_open_msg)
+                    adjrib = BGPribdb(self.name, IPv4Address(self.remote_address[0]), parsed_open_msg.AS, parsed_open_msg.bgp_id)
                     self.send(BGP_message.keepalive())
                     if not active:
                         self.send(open_msg)
@@ -308,12 +314,12 @@ class Listener(Collector):
 
         while self.state != Error:
             try:
-                self.sock,remote_address = self.listen_sock.accept()
+                self.sock,self.remote_address = self.listen_sock.accept()
                 self.sock.setblocking(True)
                 self.state = Connected
                 self.connections += 1
-                self.log_err("connected to %s\n" % _name(remote_address))
-                session = Session(self.app,self.appconfig,self.name,self.send,self.recv)
+                self.log_err("connected to %s\n" % _name(self.remote_address))
+                session = Session(self.app,self.appconfig,self.name,self.remote_address,self.send,self.recv)
                 try:
                     self.sock.shutdown(socket.SHUT_RDWR)
                     self.sock.close()
@@ -351,12 +357,13 @@ class Talker(Collector):
                     else:
                         self.log_err("reattempting connection to %s\n" % _name(self.address))
                 self.sock = socket.create_connection(self.address,1)
+                self.remote_address = self.sock.getpeername()
                 self.sock.setblocking(True)
                 self.state = Connected
                 self.connections += 1
                 self.log_err("connected to %s\n" % _name(self.address))
                 self.connections += 1
-                session = Session(self.app,self.appconfig,self.name,self.send,self.recv)
+                session = Session(self.app,self.appconfig,self.name,self.remote_address,self.send,self.recv)
                 self.sock.close()
                 self.sock.shutdown(socket.SHUT_RDWR)
             except (socket.error,socket.timeout) as e:
