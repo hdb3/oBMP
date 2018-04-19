@@ -48,16 +48,13 @@ class BGP_UPDATE_message:
 
     def __init__(self):
         self.except_flag = False
+        self.as4_flag = None
         self.unhandled_codes = []
         self.path_attributes = {}
 
     def __str__(self):
         from pprint import pformat
         return str(pformat(vars(self)))
-
-    def deparse(self):
-        msg = bytearray()
-        return msg
 
     @classmethod
     def new(cls,AS,hold_time,bgp_id,capabilities):
@@ -398,3 +395,204 @@ class BGP_UPDATE_message:
 
         else:
             assert False , "Unknown BGP path attribute type %d" % code
+
+
+# ## ### #### ##### ###### ####### ######## ######### ########## ########### ############ #############
+#
+# Deparser
+#
+# ## ### #### ##### ###### ####### ######## ######### ########## ########### ############ #############
+
+    def deparse_path_attributes(self):
+        
+        def encode_attribute(code,flags,attribute):
+    
+            msg = bytearry(code)
+            if len(attribute) > 255:
+                msg.extend(flags | BGP_Attribute_Flags_Extended_Length)
+                msg.extend(code)
+                msg.extend(struct.pack('!H',len(attribute)))
+            else:
+                msg.extend(flags)
+                msg.extend(code)
+                msg.extend(len(attribute))
+            msg.extend(attribute)
+    
+        def deparse_communities(code,attr):
+    
+            msg = bytearray(code)
+            for community in attr:
+                msg.extend(struct.pack('!HH',community))
+    
+            return msg
+    
+        def deparse_attribute_set(code,attr):
+    
+            return bytearray(code).extend(struct.pack('!I',attr[0])).extend(attr[1])
+    
+        def deparse_extended_communities(code,attr):
+    
+            msg = bytearray(code)
+            for ec1,ec2 in attr:
+                msg.extend(struct.pack('!H',ec1)).extend(ec2)
+    
+            return msg
+    
+        def deparse_large_community(code,attr):
+    
+            msg = bytearray(code)
+            for large_community in attr:
+                msg.extend(struct.pack('!III',large_community))
+    
+            return msg
+    
+        def deparse_as_pathlimit(code,attr):
+            return bytearray(code).extend(attr[0]).extend(struct.pack('!I',attr[1]))
+    
+        def deparse_connector(code,attr):
+            # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
+    
+            return bytearray(code).extend(attr)
+    
+        def deparse_unhandled(code,attr):
+            return bytearray(code).extend(attr)
+    
+    
+        # an AS path attribute has 1 or more AS segments
+        # each segment is represented by 1 byte segment type + 1 byte segment length + variable number of AS
+        # the 1 byte segment length is a count of AS, not bytes
+        # the ASes are 2 or 4 byte values depending on AS/AS4 attribute nature
+        #
+    
+        def deparse_AS_path(code,attr,as4):
+    
+            msg = bytearray(code)
+        
+            for segment_type,as_list in attr:
+                msg.extend(segment_type)
+                msg.extend(len(as_list))
+                for as in as_list:
+                    if as4:
+                        msg.extend(struct.pack('!I',as))
+                    else:
+                        msg.extend(struct.pack('!H',as))
+            return msg
+    
+    
+        # depending on AS4 nature deparse_aggregator is either 8 bytes or 6 bytes
+    
+        def deparse_aggregator(code,attr,as4):
+            if as4:
+                return deparse_4b_4b(code,attr)
+            else:
+                return deparse_2b_4b(code,attr)
+    
+        def deparse_4b_4b(code,attr):
+            return bytearray(code).extend(struct.pack('!I', attr[0])).extend(struct.pack('!I', attr[1]))
+    
+        def deparse_2b_4b(code,attr):
+            return bytearray(code).extend(struct.pack('!H', attr[0])).extend(struct.pack('!I', attr[1]))
+    
+        def deparse_32bits(code,attr):
+            return bytearray(code).extend(struct.pack('!I', attr))
+    
+        def deparse_8bits(code,attr):
+                return bytearray(code).extend(attr)
+    
+        def deparse_0_length(code,attr):
+            assert attr is None
+            return bytearray(code)
+    
+        def deparse_path_attribute(code,attr):
+            if (code==BGP_TYPE_CODE_ORIGIN):
+                return deparse_8bits(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_AS_PATH):
+                return deparse_AS_path(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_NEXT_HOP):
+                return deparse_32bits(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_MULTI_EXIT_DISC):
+                return deparse_32bits(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_LOCAL_PREF):
+                return deparse_32bits(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_ATOMIC_AGGREGATE):
+                return deparse_0_length(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_AGGREGATOR):
+                return deparse_aggregator(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_COMMUNITIES):
+                return deparse_communities(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_EXTENDED_COMMUNITIES):
+                return deparse_extended_communities(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_AS4_PATH):
+                return deparse_AS_path(code,attr,as4=self.as4_flag)
+    
+            elif (code==BGP_TYPE_CODE_AS4_AGGREGATOR):
+                return deparse_4b_4b(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_MP_REACH_NLRI or code == BGP_TYPE_CODE_MP_UNREACH_NLRI):
+                return deparse_unhandled(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_LARGE_COMMUNITY):
+                return deparse_large_community(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_ATTR_SET):
+                return deparse_attribute_set(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_AS_PATHLIMIT):
+                return deparse_as_pathlimit(code,attr)
+    
+            elif (code==BGP_TYPE_CODE_CONNECTOR):
+                return deparse_connector(code,attr)
+    
+            else:
+                assert False , "Unknown BGP path attribute type %d" % code
+    
+    
+            msg = bytearray()
+            for code,attr in self.path_attributes:
+                msg.extend(encode(deparse_path_attributes(code,attr)))
+            return msg
+
+    def deparse_prefixes(prefix_list):
+
+        msg = bytearray()
+        for prefix_length, prefix in prefix_list:
+            msg.extend(prefix_length)
+            prefix_bytearray = struct.pack('!I',prefix)
+            if prefix_length > 24:
+                msg.extend(prefix_bytearray)
+            elif prefix_length > 16:
+                msg.extend(prefix_bytearray[:3])
+            elif prefix_length > 8:
+                msg.extend(prefix_bytearray[:2])
+            elif prefix_length > 0:
+                msg.extend(prefix_bytearray[:1])
+            else:
+                pass
+
+        return msg
+
+    def deparse(self):
+
+        msg = bytearray()
+
+        withdrawn_routes = self.deparse_prefixes(self.withdrawn_prefixes)
+        msg.extend(struct.pack('!H',len(withdrawn_routes))
+        msg.extend(withdrawn_routes)
+
+        path_attributes = self.deparse_path_attributes()
+        msg.extend(struct.pack('!H',len(path_attributes))
+        msg.extend(path_attributes)
+
+        msg.extend(self.deparse_prefixes(self.prefixes))
+
+        return msg
+
