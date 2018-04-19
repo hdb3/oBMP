@@ -83,6 +83,7 @@ class Session():
                     k += 1
                     debug("\nBGP KEEPALIVE rcvd %d\n" % k)
                     self.send(BGP_message.keepalive())
+                    print(adjrib)
                 elif msg_type == BGP_NOTIFICATION:
                     debug("\nBGP NOTIFY rcvd\n")
                 elif msg_type == BGP_UPDATE:
@@ -93,6 +94,7 @@ class Session():
                         print(update)
                     elif update.end_of_rib:
                         debug("\nBGP UPDATE END_OF_RIB rcvd\n")
+                        print(adjrib)
                     else:
                         adjrib.update(update.attribute,update.prefixes)
                         adjrib.withdraw(update.withdrawn_prefixes)
