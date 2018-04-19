@@ -1,0 +1,8 @@
+# 
+# router.yml
+# active mode BMP daemon
+collector:
+    daemon: router
+    listener:
+              host: '*'
+              port: 60179
