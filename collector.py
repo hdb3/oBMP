@@ -39,6 +39,25 @@ class Session():
         else:
             self.run()
     
+
+    def create_dump_file(self):
+        from time import time
+        try:
+            os.mkdir("dump")
+        except OSError as e:
+            pass
+
+        ts = str(time())
+        fn = "dump/" + self.name + "-" + ts + ".bmp"
+        self.dump_file = open(fn,"wb")
+
+    def write_dump_file(self,msg):
+        self.dump_file.write(msg)
+        self.dump_file.flush()
+
+    def close_dump_file(self):
+        self.dump_file.close()
+
     def router(self):
         import bgppeel
         from bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE,BGP_UPDATE,BGP_NOTIFICATION
@@ -63,6 +82,7 @@ class Session():
             return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
     
         log("Session.router(%s) starting\n" % self.name)
+        self.create_dump_file()
         active = self.appconfig['mode'] == 'active'
         open_msg = make_open_msg(self.appconfig['AS'],self.appconfig['bgpid'])
         n=0
@@ -99,7 +119,11 @@ class Session():
                         adjrib.update(update.path_attributes,update.prefixes)
                         adjrib.withdraw(update.withdrawn_prefixes)
                         deparsed_update = update.deparse()
-                        print ("len original is %d len recoded msg is %d" % (len(bgp_payload), len(deparsed_update)))
+                        if len(bgp_msg) != len(deparsed_update):
+                            print ("len original is %d len recoded msg is %d" % (len(bgp_payload), len(deparsed_update)))
+                            self.write_dump_file(bgp_msg)
+                            self.write_dump_file(deparsed_update)
+                            exit()
                 elif msg_type == BGP_OPEN:
                     debug("\nBGP OPEN rcvd\n")
                     parsed_open_msg = BGP_OPEN_message.parse(bgp_payload)
