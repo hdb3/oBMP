@@ -34,32 +34,28 @@ class Session():
         else:
             self.run()
     
-    @staticmethod
-    def make_open_msg():
-
-
-        from bgpopen import BGP_OPEN_message
-        from bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE
-        from ipaddress import IPv4Address
-        from capabilitycodes import BGP_capability_codes,AFI_IPv4,SAFI_Unicast
-
-        _caps = [ (BGP_capability_codes.route_refresh, None) ]
-        caps = [ (BGP_capability_codes.route_refresh, None), \
-                 (BGP_capability_codes.multiprotocol,(AFI_IPv4,SAFI_Unicast)), \
-                 (BGP_capability_codes.AS4,64501), \
-                 (BGP_capability_codes.graceful_restart,(False,1000)) ]
-        open_msg =  BGP_OPEN_message.new(64501,60,IPv4Address('10.30.65.210'), caps)
-        return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
-
-
     def router(self):
         import bgppeel
         from bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE,BGP_UPDATE,BGP_NOTIFICATION
         from bgpopen import BGP_OPEN_message
+        from bgpupdate import BGP_UPDATE_message
+        from ipaddress import IPv4Address
+        from capabilitycodes import BGP_capability_codes,AFI_IPv4,SAFI_Unicast
+
         def debug(s):
             sys.stderr.write(s+'\r')
             sys.stderr.flush
 
+
+        def make_open_msg():
+            caps = [ (BGP_capability_codes.route_refresh, None), \
+                     (BGP_capability_codes.multiprotocol,(AFI_IPv4,SAFI_Unicast)), \
+                     (BGP_capability_codes.AS4,64505), \
+                     (BGP_capability_codes.graceful_restart,(False,1000)) ]
+            open_msg =  BGP_OPEN_message.new(64505,60,IPv4Address('10.30.65.209'), caps)
+    
+            return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
+    
         log("Session.router(%s) starting\n" % self.name)
         n=0
         r=1
@@ -74,6 +70,7 @@ class Session():
             buf.extend(msg)
             msg_type,bgp_msg,buf = bgppeel.peel(buf)
             while bgp_msg:
+                bgp_payload = bgp_msg[19:]
                 if msg_type == BGP_KEEPALIVE:
                     k += 1
                     debug("\nBGP KEEPALIVE rcvd %d\n" % k)
