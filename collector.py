@@ -118,9 +118,9 @@ class Session():
                     else:
                         adjrib.update(update.path_attributes,update.prefixes)
                         adjrib.withdraw(update.withdrawn_prefixes)
-                        deparsed_update = update.deparse()
+                        deparsed_update = BGP_message.deparse(BGP_UPDATE,update.deparse())
                         if len(bgp_msg) != len(deparsed_update):
-                            print ("len original is %d len recoded msg is %d" % (len(bgp_payload), len(deparsed_update)))
+                            print ("len original is %d len recoded msg is %d" % (len(bgp_msg), len(deparsed_update)))
                             self.write_dump_file(bgp_msg)
                             self.write_dump_file(deparsed_update)
                             exit()
