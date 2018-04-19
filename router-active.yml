@@ -1,0 +1,8 @@
+# 
+# router.yml
+# active mode BMP daemon
+collector:
+    daemon: router
+    targets:
+            - host: dell3
+              port: 179

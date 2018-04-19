@@ -46,9 +46,9 @@ class Session():
         _caps = [ (BGP_capability_codes.route_refresh, None) ]
         caps = [ (BGP_capability_codes.route_refresh, None), \
                  (BGP_capability_codes.multiprotocol,(AFI_IPv4,SAFI_Unicast)), \
-                 (BGP_capability_codes.AS4,64505), \
+                 (BGP_capability_codes.AS4,64501), \
                  (BGP_capability_codes.graceful_restart,(False,1000)) ]
-        open_msg =  BGP_OPEN_message.new(64505,60,IPv4Address('10.30.65.209'), caps)
+        open_msg =  BGP_OPEN_message.new(64501,60,IPv4Address('10.30.65.210'), caps)
         return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
 
 
@@ -56,9 +56,17 @@ class Session():
         import bgppeel
         from bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE,BGP_UPDATE,BGP_NOTIFICATION
         from bgpopen import BGP_OPEN_message
+        def debug(s):
+            sys.stderr.write(s+'\r')
+            sys.stderr.flush
+
         log("Session.router(%s) starting\n" % self.name)
         n=0
         r=1
+        k=0
+        u=0
+        self.send(self.make_open_msg())
+        self.send(BGP_message.keepalive())
         buf = bytearray()
         msg = self.recv()
         while msg:
@@ -67,20 +75,22 @@ class Session():
             msg_type,bgp_msg,buf = bgppeel.peel(buf)
             while bgp_msg:
                 if msg_type == BGP_KEEPALIVE:
-                    print("BGP KEEPALIVE rcvd")
+                    k += 1
+                    debug("\nBGP KEEPALIVE rcvd %d\n" % k)
                     self.send(BGP_message.keepalive())
                 elif msg_type == BGP_NOTIFICATION:
-                    print("BGP NOTIFY rcvd")
+                    debug("BGP NOTIFY rcvd")
                 elif msg_type == BGP_UPDATE:
-                    print("BGP UPDATE rcvd")
+                    u += 1
+                    debug("BGP UPDATE rcvd %d" % u)
                 elif msg_type == BGP_OPEN:
-                    print("BGP OPEN rcvd")
+                    debug("\nBGP OPEN rcvd\n")
                     parsed_open_msg = BGP_OPEN_message.parse(bgp_msg[19:])
                     print(parsed_open_msg)
-                    self.send(self.make_open_msg())
-                    self.send(BGP_message.keepalive())
+                    # self.send(self.make_open_msg())
+                    # self.send(BGP_message.keepalive())
                 else:
-                    print("BGP msg type %d rcvd" % msg_type)
+                    debug("BGP msg type %d rcvd" % msg_type)
                 n += 1
                 msg_type,bgp_msg,buf = bgppeel.peel(buf)
             msg = self.recv()
