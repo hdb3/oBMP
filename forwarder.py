@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
+##!/usr/bin/python3
 
 #
 # forwarder.py
@@ -11,6 +12,7 @@ import socket
 import threading
 from time import sleep
 import pprint
+assert sys.version_info > (3,5)
 
 Initialising = 1
 Connecting = 2

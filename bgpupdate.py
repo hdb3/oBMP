@@ -10,7 +10,8 @@
 import sys
 import traceback
 import struct
-from ipaddress import IPv4Network
+from ipaddress import IPv4Network,AddressValueError
+import binascii
 
 logfile=sys.stderr
 def eprint(s):
@@ -184,7 +185,6 @@ class BGP_UPDATE_message:
             if prefix_byte_length > 3:
                 prefix |= struct.unpack_from('!B', prefix_list, offset=offset+4)[0]
 
-            #prefixes.append((prefix,prefix_length))
             prefixes.append(IPv4Network((prefix,prefix_length)))
             offset += 1 + prefix_byte_length
 

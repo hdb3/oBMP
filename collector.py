@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
+##!/usr/bin/python3
 
 #
 # collector.py
@@ -12,6 +13,7 @@ import sys
 import socket
 import threading
 from time import sleep
+assert sys.version_info > (3,5)
 
 def log(c):
     sys.stderr.write(c)
@@ -48,7 +50,7 @@ class Session():
             pass
 
         ts = str(time())
-        fn = "dump/" + self.name + "-" + ts + ".bmp"
+        fn = "dump/" + self.name + "-" + ts + ".bgp"
         self.dump_file = open(fn,"wb")
 
     def write_dump_file(self,msg):

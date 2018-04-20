@@ -8,6 +8,7 @@ import threading
 import pickle
 import sys
 import hashlib
+from ipaddress import IPv4Network
 
 class BGPribdb:
     def __init__(self,src,remote_address,remote_AS,remote_BGPID):
@@ -116,7 +117,8 @@ class BGPribdb:
 
     def atomic_update(self,pfx,pa_hash):
 
-        assert isinstance(pfx,tuple)
+        #assert isinstance(pfx,tuple)
+        assert isinstance(pfx,IPv4Network)
         # ALWAYS update the main RIB
         # UNLESS the RIB is unchanged schedule update sending
         if pa_hash not in self.rib or self.rib[pfx] != pa_hash:
@@ -148,7 +150,8 @@ class BGPribdb:
         if pa_hash not in self.path_update_requests:
             self.path_update_requests[pa_hash] = []
         for pfx in pfx_list:
-            assert isinstance(pfx,tuple)
+            assert isinstance(pfx,IPv4Network)
+            #assert isinstance(pfx,tuple)
             self.atomic_update(pfx,pa_hash)
         self.unlock()
 
