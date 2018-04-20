@@ -559,17 +559,16 @@ class BGP_UPDATE_message:
         def encode_attribute(code,flags,attribute):
 
             msg = bytearray()
-            if attribute is not None:
-                if len(attribute) > 255 or code == BGP_TYPE_CODE_AS_PATH:
-                    # always write an AS_PATH as extended, for compatibility with e.g. quagga
-                    msg.extend(b(flags | BGP_Attribute_Flags_Extended_Length))
-                    msg.extend(b(code))
-                    msg.extend(w(len(attribute)))
-                else:
-                    msg.extend(b(flags))
-                    msg.extend(b(code))
-                    msg.extend(b(len(attribute)))
-                msg.extend(attribute)
+            if len(attribute) > 255 or code == BGP_TYPE_CODE_AS_PATH:
+                # always write an AS_PATH as extended, for compatibility with e.g. quagga
+                msg.extend(b(flags | BGP_Attribute_Flags_Extended_Length))
+                msg.extend(b(code))
+                msg.extend(w(len(attribute)))
+            else:
+                msg.extend(b(flags))
+                msg.extend(b(code))
+                msg.extend(b(len(attribute)))
+            msg.extend(attribute)
             return msg
 
         def deparse_communities(code,attr):
@@ -667,8 +666,7 @@ class BGP_UPDATE_message:
             return b(attr)
 
         def deparse_0_length(code,attr):
-            assert attr is None
-            return None
+            return bytearray()
 
         def deparse_path_attribute(code,attr):
             if (code==BGP_TYPE_CODE_ORIGIN):
