@@ -330,11 +330,9 @@ class BGP_UPDATE_message:
                 l = getb_at(msg,offset+1)
                 if l == 0:
                     return (False, "(7) - zero segment length")
-                if l % siz != 0:
-                    return (False, "(8) - invalid segment length %d mod %d = %d, not zero" % (l,siz,l % siz))
                 pathbytelength = l * siz
                 if len(msg) < offset+2+pathbytelength:
-                    return (False, "(9) - short segment length %d < %d" % (len(msg),offset+2+pathbytelength))
+                    return (False, "(8) - short segment length %d < %d" % (len(msg),offset+2+pathbytelength))
                 path = []
                 for ix in range(offset+2,offset+2+pathbytelength,siz):
                     if siz == 2:
@@ -342,6 +340,7 @@ class BGP_UPDATE_message:
                     else:
                         path.append(getl_at(msg,ix))
                 segments.append((t,path))
+                offset += 2 + pathbytelength
             return (True,segments)
 
         if self.as4_flag is None:
