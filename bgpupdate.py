@@ -560,7 +560,8 @@ class BGP_UPDATE_message:
 
             msg = bytearray()
             if attribute is not None:
-                if len(attribute) > 255:
+                if len(attribute) > 255 or code == BGP_TYPE_CODE_AS_PATH:
+                    # always write an AS_PATH as extended, for compatibility with e.g. quagga
                     msg.extend(b(flags | BGP_Attribute_Flags_Extended_Length))
                     msg.extend(b(code))
                     msg.extend(w(len(attribute)))
@@ -581,7 +582,8 @@ class BGP_UPDATE_message:
 
         def deparse_attribute_set(code,attr):
 
-            msg = l(attr[0])
+            msg = bytearray()
+            msg.extend(attr[0])
             msg.extend(attr[1])
             return msg
 
@@ -604,7 +606,8 @@ class BGP_UPDATE_message:
             return msg
 
         def deparse_as_pathlimit(code,attr):
-            msg      = b(attr[0])
+            msg = bytearray()
+            msg.extend(b(attr[0]))
             msg.extend(l(attr[1]))
             return msg
 
@@ -646,12 +649,14 @@ class BGP_UPDATE_message:
                 return deparse_2b_4b(code,attr)
 
         def deparse_4b_4b(code,attr):
-            msg      = l(attr[0])
+            msg = bytearray()
+            msg.extend(l(attr[0]))
             msg.extend(l(attr[1]))
             return msg
 
         def deparse_2b_4b(code,attr):
-            msg      = w(attr[0])
+            msg = bytearray()
+            msg.extend(w(attr[0]))
             msg.extend(l(attr[1]))
             return msg
 
