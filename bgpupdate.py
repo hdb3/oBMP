@@ -111,11 +111,14 @@ class BGP_UPDATE_message:
         return str(pformat(vars(self)))
 
     @classmethod
-    def new(cls,AS,hold_time,bgp_id,capabilities):
+    def new(cls,updates,withdrawn,paths):
         self = cls()
-
+        for attribute in paths:
+            code,attribute = attribute.value()
+            self.path_attributes[code] = attribute
+        self.withdrawn_prefixes = withdrawn
+        self.prefixes = updates
         return self
-
 
     def eprint(s):
         sys.stderr.write(s+'\n')
@@ -469,7 +472,7 @@ class BGP_UPDATE_message:
 
         def encode_attribute(code,flags,attribute):
 
-            msg = b(code)
+            msg = bytearray()
             if attribute is not None:
                 if len(attribute) > 255:
                     msg.extend(b(flags | BGP_Attribute_Flags_Extended_Length))
@@ -484,7 +487,7 @@ class BGP_UPDATE_message:
 
         def deparse_communities(code,attr):
 
-            msg = b(code)
+            msg = bytearray()
             for community in attr:
                 msg.extend(l(community))
 
@@ -492,14 +495,13 @@ class BGP_UPDATE_message:
 
         def deparse_attribute_set(code,attr):
 
-            msg = b(code)
-            msg.extend(l(attr[0]))
+            msg = l(attr[0])
             msg.extend(attr[1])
             return msg
 
         def deparse_extended_communities(code,attr):
 
-            msg = b(code)
+            msg = bytearray()
             for ec1,ec2 in attr:
                 msg.extend(w(ec1))
                 msg.extend(ec2)
@@ -508,7 +510,7 @@ class BGP_UPDATE_message:
 
         def deparse_large_community(code,attr):
 
-            msg = b(code)
+            msg = bytearray()
             for large_community in attr:
                 assert 12 == len(large_community)
                 msg.extend(large_community)
@@ -516,22 +518,16 @@ class BGP_UPDATE_message:
             return msg
 
         def deparse_as_pathlimit(code,attr):
-            msg = b(code)
-            msg.extend(b(attr[0]))
+            msg      = b(attr[0])
             msg.extend(l(attr[1]))
             return msg
 
         def deparse_connector(code,attr):
             # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
-
-            msg = b(code)
-            msg.extend(attr)
-            return msg
+            return attr
 
         def deparse_unhandled(code,attr):
-            msg = b(code)
-            msg.extend(attr)
-            return msg
+            return attr
 
 
         # an AS path attribute has 1 or more AS segments
@@ -542,7 +538,7 @@ class BGP_UPDATE_message:
 
         def deparse_AS_path(code,attr,as4):
 
-            msg = b(code)
+            msg = bytearray()
 
             for segment_type,as_list in attr:
                 msg.extend(b(segment_type))
@@ -564,23 +560,24 @@ class BGP_UPDATE_message:
                 return deparse_2b_4b(code,attr)
 
         def deparse_4b_4b(code,attr):
-            msg = b(code)
-            msg.extend(l(attr[0]))
+            msg      = l(attr[0])
             msg.extend(l(attr[1]))
             return msg
 
         def deparse_2b_4b(code,attr):
-            return b(code).extend(w( attr[0])).extend(l( attr[1]))
+            msg      = w(attr[0])
+            msg.extend(l(attr[1]))
+            return msg
 
         def deparse_32bits(code,attr):
-            return b(code).extend(l( attr))
+            return l(attr)
 
         def deparse_8bits(code,attr):
-                return b(code).extend(b(attr))
+            return b(attr)
 
         def deparse_0_length(code,attr):
             assert attr is None
-            return b(code)
+            return None
 
         def deparse_path_attribute(code,attr):
             if (code==BGP_TYPE_CODE_ORIGIN):
@@ -633,7 +630,6 @@ class BGP_UPDATE_message:
 
             else:
                 assert False , "Unknown BGP path attribute type %d" % code
-
 
         msg = bytearray()
         for code,attr in self.path_attributes.items():
