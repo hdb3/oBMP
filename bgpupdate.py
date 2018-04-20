@@ -10,7 +10,7 @@
 import sys
 import traceback
 import struct
-#from ipaddress import IPv4Address
+from ipaddress import IPv4Network
 
 logfile=sys.stderr
 def eprint(s):
@@ -112,6 +112,10 @@ class BGP_UPDATE_message:
 
     @classmethod
     def new(cls,updates,withdrawn,paths):
+        return cls._new(map(IPv4Network,updates),map(IPv4Network,withdrawn),paths)
+
+    @classmethod
+    def _new(cls,updates,withdrawn,paths):
         self = cls()
         for attribute in paths:
             code,attribute = attribute.value()
@@ -180,7 +184,8 @@ class BGP_UPDATE_message:
             if prefix_byte_length > 3:
                 prefix |= struct.unpack_from('!B', prefix_list, offset=offset+4)[0]
 
-            prefixes.append((prefix_length,prefix))
+            #prefixes.append((prefix,prefix_length))
+            prefixes.append(IPv4Network((prefix,prefix_length)))
             offset += 1 + prefix_byte_length
 
         return prefixes
@@ -644,16 +649,16 @@ class BGP_UPDATE_message:
         def deparse_prefixes(prefix_list):
 
             msg = bytearray()
-            for prefix_length, prefix in prefix_list:
-                msg.extend(b(prefix_length))
-                prefix_bytearray = l(prefix)
-                if prefix_length > 24:
+            for network in prefix_list:
+                msg.extend(b(network.prefixlen))
+                prefix_bytearray = l(int(network.network_address))
+                if network.prefixlen > 24:
                     msg.extend(prefix_bytearray)
-                elif prefix_length > 16:
+                elif network.prefixlen > 16:
                     msg.extend(prefix_bytearray[:3])
-                elif prefix_length > 8:
+                elif network.prefixlen > 8:
                     msg.extend(prefix_bytearray[:2])
-                elif prefix_length > 0:
+                elif network.prefixlen > 0:
                     msg.extend(prefix_bytearray[:1])
                 else:
                     pass

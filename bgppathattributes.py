@@ -92,7 +92,6 @@ class BGP_attribute:
 
     def parse_attribute_32bits(self,code,attr):
         assert isinstance(attr,int)
-        ## print("type",type(attr),file=sys.stderr)
         assert attr < 0x100000000
         self.attribute = attr
 
