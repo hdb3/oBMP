@@ -125,10 +125,6 @@ class BGP_UPDATE_message:
         self.prefixes = updates
         return self
 
-    def eprint(s):
-        sys.stderr.write(s+'\n')
-        sys.stderr.flush()
-
     @classmethod
     def parse(cls,msg):
         self = cls()
@@ -220,9 +216,9 @@ class BGP_UPDATE_message:
             except AssertionError as e:
                 self.except_flag = True
                 eprint("++failed to parse attribute seq %d at offset %d/length %d, flags:code = (%x,%d) payload %s" \
-                        % (attr_count,offset,length,attr_flags,attr_type_code,hexlify(attribute)))
+                        % (attr_count,offset,length,attr_flags,attr_type_code,attribute.hex()))
                 eprint("++failed to parse attribute  : error: %s" % e)
-                eprint("++failed to parse attributes : %d %s" % (attributes_len,hexlify(attributes)))
+                eprint("++failed to parse attributes : %d %s" % (attributes_len,attributes.hex()))
                 traceback.print_tb( sys.exc_info()[2])
                 exit()
             offset += length+quantum
@@ -297,7 +293,92 @@ class BGP_UPDATE_message:
             ##eprint("parse_attribute_connector: value %s" % attr.hex())
 
 
+    # ## ### #### ##### ###### ####### ######## ######### ########## ########### ############ #############
     def parse_attribute_AS_path(self,code,attr,as4=False):
+
+        def getb_at(msg,pos):
+            return struct.unpack_from('!B', msg, offset=pos)[0]
+
+        def getw_at(msg,pos):
+            return struct.unpack_from('!H', msg, offset=pos)[0]
+
+        def getl_at(msg,pos):
+            return struct.unpack_from('!I', msg, offset=pos)[0]
+
+        def get_segments(msg,siz):
+
+            if msg is None:
+                return (False, "(0) - null msg")
+                
+            if not isinstance(msg,bytearray):
+                return (False, "(1) - invalid msg type %s" % str(type(msg)))
+                
+            if len(msg) == 0:
+                return (False, "(3) - empty msg")
+                
+            if siz not in (2,4):
+                return (False, "(4) - invalid size %d" % siz)
+
+            offset = 0
+            segments = []
+            while offset < len(msg):
+                if len(msg) - offset < 2 + siz:
+                    return (False, "(5) - short segment")
+                t = getb_at(msg,offset)
+                if t not in (1,2):
+                    return (False, "(6) - invalid segment type %d" % t)
+                l = getb_at(msg,offset+1)
+                if l == 0:
+                    return (False, "(7) - zero segment length")
+                if l % siz != 0:
+                    return (False, "(8) - invalid segment length %d mod %d = %d, not zero" % (l,siz,l % siz))
+                pathbytelength = l * siz
+                if len(msg) < offset+2+pathbytelength:
+                    return (False, "(9) - short segment length %d < %d" % (len(msg),offset+2+pathbytelength))
+                path = []
+                for ix in range(offset+2,offset+2+pathbytelength,siz):
+                    if siz == 2:
+                        path.append(getw_at(msg,ix))
+                    else:
+                        path.append(getl_at(msg,ix))
+                segments.append((t,path))
+            return (True,segments)
+
+        if self.as4_flag is None:
+            path_as4 = get_segments(attr,4)
+            path_as2 = get_segments(attr,2)
+            if path_as4[0] and path_as2[0]:
+                eprint("ambiguous AS path can be read as AS2 or AS4 - choosing AS4")
+                self.as4_flag = True
+                segments = path_as4[1]
+            elif path_as4[0]:
+                self.as4_flag = True
+                segments = path_as4[1]
+            elif path_as2[0]:
+                self.as4_flag = False
+                segments = path_as2[1]
+            else:
+                eprint("invalid AS path can not be read as AS2 or AS4")
+                eprint("AS4 error parse msg: %s" % path_as4[1])
+                eprint("AS2 error parse msg: %s" % path_as2[1])
+                segments = None
+        else:
+            if self.as4_flag:
+                path = get_segments(attr,4)
+            else:
+                path = get_segments(attr,2)
+
+            if path[0]:
+                segments = path[1]
+            else:
+                eprint("invalid AS path")
+                eprint("error parse msg: %s" % path[1])
+                segments = None
+
+        if segments:
+            self.path_attributes[code] = segments
+    # ## ### #### ##### ###### ####### ######## ######### ########## ########### ############ #############
+    def _parse_attribute_AS_path(self,code,attr,as4=False):
 
     # an AS path attribute has 1 or more AS segments
     # each segment is represented by 1 byte segment type + 1 byte segment length + variable number of AS
@@ -420,6 +501,7 @@ class BGP_UPDATE_message:
 
         elif (code==BGP_TYPE_CODE_AS_PATH):
             self.parse_attribute_AS_path(code,attr)
+            print("AS path:", self.path_attributes[code])
 
         elif (code==BGP_TYPE_CODE_NEXT_HOP):
             self.parse_attribute_32bits(code,attr)
