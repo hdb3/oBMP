@@ -28,9 +28,6 @@ class Session():
         self.recv = recv
         self.send = send
 
-        print("Session - appconfig:")
-        print(self.appconfig)
-
         if app:
             if hasattr(self,app):
                 getattr(self,app)()
@@ -56,6 +53,7 @@ class Session():
     def write_dump_file(self,msg):
         self.dump_file.write(msg)
         self.dump_file.flush()
+        return self.dump_file_name
 
     def close_dump_file(self):
         self.dump_file.close()

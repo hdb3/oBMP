@@ -293,7 +293,17 @@ class BGP_UPDATE_message:
             ##eprint("parse_attribute_connector: value %s" % attr.hex())
 
 
-    # ## ### #### ##### ###### ####### ######## ######### ########## ########### ############ #############
+
+    # an AS path attribute has 1 or more AS segments
+    # each segment is represented by 1 byte segment type + 1 byte segment length + variable number of AS
+    # the 1 byte segment length is a count of AS, not bytes
+    # the ASes are 2 or 4 byte values depending on AS/AS4 attribute nature
+    #
+    # if the AS4 state is unknown thene the parser tries both
+    # in the unlikley event both views are valid it will select AS4
+    # but not very likely i think
+    # ( update - it really does happen!!!!! )
+
     def parse_attribute_AS_path(self,code,attr,as4=False):
 
         def getb_at(msg,pos):
@@ -343,123 +353,46 @@ class BGP_UPDATE_message:
                 offset += 2 + pathbytelength
             return (True,segments)
 
-        if self.as4_flag is None:
-            path_as4 = get_segments(attr,4)
-            path_as2 = get_segments(attr,2)
-            if path_as4[0] and path_as2[0]:
-                eprint("ambiguous AS path can be read as AS2 or AS4 - choosing AS4")
-                self.as4_flag = True
-                segments = path_as4[1]
-                self.except_flag = True
-            elif path_as4[0]:
-                self.as4_flag = True
-                segments = path_as4[1]
-            elif path_as2[0]:
-                self.as4_flag = False
-                segments = path_as2[1]
-            else:
-                eprint("invalid AS path can not be read as AS2 or AS4")
-                eprint("AS4 error parse msg: %s" % path_as4[1])
-                eprint("AS2 error parse msg: %s" % path_as2[1])
-                segments = None
-                self.except_flag = True
+        if len(attr) == 0:
+            # an empty AS path is perfectly valid for iBGP
+            self.path_attributes[code] = []
         else:
-            if self.as4_flag:
-                path = get_segments(attr,4)
+            if self.as4_flag is None:
+                path_as4 = get_segments(attr,4)
+                path_as2 = get_segments(attr,2)
+                if path_as4[0] and path_as2[0]:
+                    eprint("ambiguous AS path can be read as AS2 or AS4 - choosing AS4")
+                    self.as4_flag = True
+                    segments = path_as4[1]
+                    self.except_flag = True
+                elif path_as4[0]:
+                    self.as4_flag = True
+                    segments = path_as4[1]
+                elif path_as2[0]:
+                    self.as4_flag = False
+                    segments = path_as2[1]
+                else:
+                    eprint("invalid AS path can not be read as AS2 or AS4")
+                    eprint("AS4 error parse msg: %s" % path_as4[1])
+                    eprint("AS2 error parse msg: %s" % path_as2[1])
+                    segments = None
+                    self.except_flag = True
             else:
-                path = get_segments(attr,2)
+                if self.as4_flag:
+                    path = get_segments(attr,4)
+                else:
+                    path = get_segments(attr,2)
+    
+                if path[0]:
+                    segments = path[1]
+                else:
+                    eprint("invalid AS path")
+                    eprint("error parse msg: %s" % path[1])
+                    segments = None
+                    self.except_flag = True
 
-            if path[0]:
-                segments = path[1]
-            else:
-                eprint("invalid AS path")
-                eprint("error parse msg: %s" % path[1])
-                segments = None
-                self.except_flag = True
-
-        if segments:
-            self.path_attributes[code] = segments
-    # ## ### #### ##### ###### ####### ######## ######### ########## ########### ############ #############
-    def _parse_attribute_AS_path(self,code,attr,as4=False):
-
-    # an AS path attribute has 1 or more AS segments
-    # each segment is represented by 1 byte segment type + 1 byte segment length + variable number of AS
-    # the 1 byte segment length is a count of AS, not bytes
-    # the ASes are 2 or 4 byte values depending on AS/AS4 attribute nature
-    #
-    # thus the code loops over multiple segments, consuming the attribute payload, only stopping when it runs out of data
-    # each segment is processed by an inner loop, loop count based on the number of ASes in the segment AS count header
-    #
-    # the result is a list of segments, each segment is a tuple (segment type, AS list)
-    #
-    # NB!:
-    # AS paths can hold AS4 or AS2 and there is no way to know based on just the BGP message which is present
-    # ..... however.....
-    # it is exceedingly unlikely  that a valid path in one format is also valid in the other!
-    # So, attempting to parse as AS4 first is the right thing to do
-
-
-        def getb_at(msg,pos):
-            assert isinstance(msg,bytearray)
-            assert 0 < len(msg)
-            return struct.unpack_from('!B', msg, offset=pos)[0]
-
-        def getw_at(msg,pos):
-            assert isinstance(msg,bytearray)
-            assert 0 < len(msg)
-            return struct.unpack_from('!H', msg, offset=pos)[0]
-
-        def getl_at(msg,pos):
-            assert isinstance(msg,bytearray)
-            assert 0 < len(msg)
-            return struct.unpack_from('!I', msg, offset=pos)[0]
-
-        def get_segment(msg,as4):
-
-            if as4:
-                get_asn_at = getl_at
-                asn_len = 4
-                asn_shift = lambda n : n << 2
-            else:
-                get_asn_at = getw_at
-                asn_len = 2
-                asn_shift = lambda n : n << 1
-
-            assert len(msg) >= 4
-
-            segment_type = getb_at(msg,0)
-            assert segment_type == 1 or segment_type == 2
-
-            segment_length = getb_at(msg,1)
-            assert len(msg) >= 2 + asn_shift(segment_length)
-
-            as_list = []
-            for offset in range(0,segment_length,asn_len):
-                as_list.append(get_asn_at(msg, offset))
-
-            return (segment_type,as_list,msg[2 + asn_shift(segment_length):])
-
-        def get_segments(msg,as4):
-            segments=[]
-            while msg:
-                segment_type,as_list,msg = get_segment(msg,as4)
-                segments.append((segment_type,as_list))
-            return segments
-
-        segments = []
-        try:
-            segments = get_segments(attr,True)
-            self.as4_check(True)
-        except AssertionError as ae:
-            try:
-                segments = get_segments(attr,False)
-                self.as4_check(False)
-            except AssertionError as ae:
-                eprint("could not read AS path as AS2 or AS4")
-
-
-        if segments:
-            self.path_attributes[code] = segments
+            if segments:
+                self.path_attributes[code] = segments
 
     def parse_attribute_aggregator(self,code,attr):
     # depending on AS4 nature this is either 8 bytes or 6 bytes
