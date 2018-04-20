@@ -350,6 +350,7 @@ class BGP_UPDATE_message:
                 eprint("ambiguous AS path can be read as AS2 or AS4 - choosing AS4")
                 self.as4_flag = True
                 segments = path_as4[1]
+                self.except_flag = True
             elif path_as4[0]:
                 self.as4_flag = True
                 segments = path_as4[1]
@@ -361,6 +362,7 @@ class BGP_UPDATE_message:
                 eprint("AS4 error parse msg: %s" % path_as4[1])
                 eprint("AS2 error parse msg: %s" % path_as2[1])
                 segments = None
+                self.except_flag = True
         else:
             if self.as4_flag:
                 path = get_segments(attr,4)
@@ -373,6 +375,7 @@ class BGP_UPDATE_message:
                 eprint("invalid AS path")
                 eprint("error parse msg: %s" % path[1])
                 segments = None
+                self.except_flag = True
 
         if segments:
             self.path_attributes[code] = segments
@@ -500,7 +503,6 @@ class BGP_UPDATE_message:
 
         elif (code==BGP_TYPE_CODE_AS_PATH):
             self.parse_attribute_AS_path(code,attr)
-            print("AS path:", self.path_attributes[code])
 
         elif (code==BGP_TYPE_CODE_NEXT_HOP):
             self.parse_attribute_32bits(code,attr)
@@ -582,7 +584,7 @@ class BGP_UPDATE_message:
         def deparse_attribute_set(code,attr):
 
             msg = bytearray()
-            msg.extend(attr[0])
+            msg.extend(l(attr[0]))
             msg.extend(attr[1])
             return msg
 

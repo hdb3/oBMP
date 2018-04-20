@@ -49,9 +49,9 @@ class Session():
         except OSError as e:
             pass
 
-        ts = str(time())
-        fn = "dump/" + self.name + "-" + ts + ".bgp"
-        self.dump_file = open(fn,"wb")
+        fn = self.name + "-" + str(time()) + ".bgp"
+        self.dump_file_name = fn
+        self.dump_file = open("dump/" + fn,"wb")
 
     def write_dump_file(self,msg):
         self.dump_file.write(msg)
@@ -113,6 +113,8 @@ class Session():
                     debug("BGP UPDATE rcvd %d" % u)
                     update = BGP_UPDATE_message.parse(bgp_payload)
                     if update.except_flag:
+                        fn = self.write_dump_file(bgp_msg)
+                        debug("exception - msg written to dump file %s " % fn)
                         print(update)
                     elif update.end_of_rib:
                         debug("\nBGP UPDATE END_OF_RIB rcvd\n")
