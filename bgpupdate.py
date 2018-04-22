@@ -12,6 +12,7 @@ import traceback
 import struct
 from ipaddress import IPv4Network,AddressValueError
 import binascii
+from bgpmsg import BGP_message
 
 logfile=sys.stderr
 def eprint(s):
@@ -91,9 +92,10 @@ def check_flags(code,flags):
     assert (flags & (BGP_Attribute_Flags_Optional | BGP_Attribute_Flags_Transitive) ) == attribute_flags[code] , \
         "flag check failed for attribute %d, flags %s:%s" % (code, show_flags(flags), show_flags(attribute_flags[code]))
 
-class BGP_UPDATE_message:
+class BGP_UPDATE_message(BGP_message):
 
     def __init__(self):
+        BGP_message.__init__(self)
         self.except_flag = False
         self.as4_flag = None
         self.unhandled_codes = []
