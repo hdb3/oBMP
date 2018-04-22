@@ -79,7 +79,8 @@ class Session():
                      (BGP_capability_codes.graceful_restart,(False,1000)) ]
             open_msg =  BGP_OPEN_message.new(AS,60,IPv4Address(bgpid), caps)
     
-            return BGP_message.deparse(BGP_OPEN,open_msg.deparse())
+            return BGP_message.deparse(open_msg)
+            #return BGP_message.deparse(open_msg.deparse())
     
         log("Session.router(%s) starting\n" % self.name)
         self.create_dump_file()
@@ -102,7 +103,7 @@ class Session():
                 if msg_type == BGP_KEEPALIVE:
                     k += 1
                     debug("\nBGP KEEPALIVE rcvd %d\n" % k)
-                    self.send(BGP_message.keepalive())
+                    self.send(BGP_message.deparse(None))
                     print(adjrib)
                 elif msg_type == BGP_NOTIFICATION:
                     debug("\nBGP NOTIFY rcvd\n")
@@ -120,7 +121,7 @@ class Session():
                     else:
                         adjrib.update(update.path_attributes,update.prefixes)
                         adjrib.withdraw(update.withdrawn_prefixes)
-                        deparsed_update = BGP_message.deparse(BGP_UPDATE,update.deparse())
+                        deparsed_update = BGP_message.deparse(update)
                         if len(bgp_msg) != len(deparsed_update):
                             print ("len original is %d len recoded msg is %d" % (len(bgp_msg), len(deparsed_update)))
                             self.write_dump_file(bgp_msg)
@@ -133,7 +134,7 @@ class Session():
                     deparsed_open_msg = parsed_open_msg.deparse()
                     print ("len original is %d len recoded msg is %d" % (len(bgp_payload), len(deparsed_open_msg)))
                     adjrib = BGPribdb(self.name, IPv4Address(self.remote_address[0]), parsed_open_msg.AS, parsed_open_msg.bgp_id)
-                    self.send(BGP_message.keepalive())
+                    self.send(BGP_message.deparse(None))
                     if not active:
                         self.send(open_msg)
                 else:

@@ -66,7 +66,7 @@ class BGP_message:
             
         raw_msg = bytearray()
         raw_msg.extend(BGP_marker)
-        raw_msg.extend(pack('!H',19+len(msg)))
+        raw_msg.extend(pack('!H',19+len(payload)))
         raw_msg.extend(pack('!B',msg_type))
-        raw_msg.extend(msg)
+        raw_msg.extend(payload)
         return raw_msg
