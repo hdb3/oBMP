@@ -40,11 +40,11 @@ class BGP_message:
         if self.bgp_type == BGP_UPDATE:
             # note - parsing an UPDATE may take an indication of the AS4 nature which cannot be known 
             # via this interface.
-            return bgpupdate.BGP_UPDATE_message(self.payload)
+            return BGP_UPDATE_message.parse(self.payload)
         elif self.bgp_type == BGP_OPEN:
-            return bgpopen.BGP_OPEN_message(self.payload)
+            return BGP_OPEN_message.parse(self.payload)
         elif self.bgp_type == BGP_NOTIFICATION:
-            return bgpnotification.BGP_NOTIFICATION_message(self.payload)
+            return BGP_NOTIFICATION_message.parse(self.payload)
         else:
             # KEEPALIVE has no payload
             return None
@@ -53,13 +53,13 @@ class BGP_message:
     def deparse(msg):
         if isinstance(msg,BGP_OPEN_message):
             msg_type = BGP_OPEN
-            payload = BGP_OPEN_message.deparse()
+            payload = BGP_OPEN_message.deparse(msg)
         elif isinstance(msg,BGP_UPDATE_message):
             msg_type = BGP_UPDATE
-            payload = BGP_UPDATE_message.deparse()
+            payload = BGP_UPDATE_message.deparse(msg)
         elif isinstance(msg,BGP_NOTIFICATION_message):
             msg_type = BGP_NOTIFICATION
-            payload = BGP_NOTIFICATION_message.deparse()
+            payload = BGP_NOTIFICATION_message.deparse(msg)
         else:
             msg_type = BGP_KEEPALIVE
             payload = bytearray()

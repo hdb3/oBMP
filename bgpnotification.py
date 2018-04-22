@@ -3,7 +3,7 @@
 # parse and build a representation of a BGP NOTIFICATION message
 #
 
-class BGP_OPEN_message:
+class BGP_NOTIFICATION_message:
 
     def __init__(self):
         pass
