@@ -8,11 +8,10 @@ import threading
 import pickle
 import sys
 import hashlib
-from ipaddress import IPv4Network
+import ipaddress
 
 class BGPribdb:
     def __init__(self,src,remote_address,remote_AS,remote_BGPID):
-
         self.src = src
         self.remote_address = remote_address
         self.remote_AS = remote_AS
@@ -87,16 +86,17 @@ class BGPribdb:
             cnt_all_prefixes_withdrawn += self.all_prefixes_withdrawn[pfx]
 
 
-        return \
-               "-- ID:%s" % self.src + "  **  BGPribdb state  **\n" + \
-               "-- ID:%s" % self.src + "  Remote Peer: AS %d ID:%s addr:%s\n" % (self.remote_AS,self.remote_BGPID,self.remote_address) + \
-               "-- ID:%s" % self.src + "  rib size %d    " % len(self.rib) + \
-                                       "  paths in rib %d\n" % len(self.path_attributes) + \
-               "-- ID:%s" % self.src + "  *refresh queue * paths / prefixes = %d/%d\n" % ( cnt_refresh_paths,cnt_refresh_prefixes) + \
-               "-- ID:%s" % self.src + "  *historic view* prefixes rcvd / unique prefixes rcvd = %d/%d\n" % ( cnt_all_prefixes_rcvd,cnt_all_unique_prefixes_rcvd) + \
-               "-- ID:%s" % self.src + "  *historic view* prefixes withd / unique prefixes withd = %d/%d\n" % ( cnt_all_prefixes_withdrawn,cnt_all_unique_prefixes_withdrawn) + \
-               "-- ID:%s" % self.src + "  *global view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (pa_hashes_in_update,prefixes_in_update,prefixes_in_withdraw) + \
-               "-- ID:%s" % self.src + "  *path view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (path_pa_hashes_in_update,path_prefixes_in_update,path_prefixes_in_withdraw)
+        s = "-- ID:%s" % self.src + "  **  BGPribdb state  **\n"
+        s += "-- ID:%s" % self.src + "  Remote Peer: AS %d ID:%s addr:%s\n" % (self.remote_AS,self.remote_BGPID,self.remote_address)
+        s += "-- ID:%s" % self.src + "  rib size %d    " % len(self.rib)
+        s += "  paths in rib %d\n" % len(self.path_attributes)
+        s += "-- ID:%s" % self.src + "  *refresh queue * paths / prefixes = %d/%d\n" % ( cnt_refresh_paths,cnt_refresh_prefixes)
+        s += "-- ID:%s" % self.src + "  *historic view* prefixes rcvd / unique prefixes rcvd = %d/%d\n" % ( cnt_all_prefixes_rcvd,cnt_all_unique_prefixes_rcvd)
+        s += "-- ID:%s" % self.src + "  *historic view* prefixes withd / unique prefixes withd = %d/%d\n" % ( cnt_all_prefixes_withdrawn,cnt_all_unique_prefixes_withdrawn)
+        s += "-- ID:%s" % self.src + "  *global view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (pa_hashes_in_update,prefixes_in_update,prefixes_in_withdraw)
+        s += "-- ID:%s" % self.src + "  *path view* paths/prefixes/withdrawn in update %d/%d/%d\n" % (path_pa_hashes_in_update,path_prefixes_in_update,path_prefixes_in_withdraw)
+        s += "-- ID:%s" % self.src + "  **  BGPribdb END  **\n"
+        return s
 
     def lock(self):
         self.db_lock.acquire()
@@ -118,7 +118,7 @@ class BGPribdb:
     def atomic_update(self,pfx,pa_hash):
 
         #assert isinstance(pfx,tuple)
-        assert isinstance(pfx,IPv4Network)
+        assert isinstance(pfx,ipaddress.IPv4Network)
         # ALWAYS update the main RIB
         # UNLESS the RIB is unchanged schedule update sending
         if pa_hash not in self.rib or self.rib[pfx] != pa_hash:
@@ -150,7 +150,7 @@ class BGPribdb:
         if pa_hash not in self.path_update_requests:
             self.path_update_requests[pa_hash] = []
         for pfx in pfx_list:
-            assert isinstance(pfx,IPv4Network)
+            assert isinstance(pfx,ipaddress.IPv4Network)
             #assert isinstance(pfx,tuple)
             self.atomic_update(pfx,pa_hash)
         self.unlock()

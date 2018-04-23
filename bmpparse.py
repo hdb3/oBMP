@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import bgppeel
+from ipaddress import IPv4Address,IPv6Address
 from bgpmsg import BGP_message
 def eprint(s):
     sys.stderr.write(s+'\n')
@@ -132,10 +133,14 @@ class BMP_message:
             self.bmp_ppc_fixed_hash = hash(str(msg[6:40]))
             self.bmp_ppc_Peer_Type = struct.unpack_from('!B', msg, offset=6)[0]               # 1 byte index 6
             self.bmp_ppc_Peer_Flags = struct.unpack_from('!B', msg, offset=7)[0]              # 1 byte index 7
+            self.bmp_ppc_Peer_Flags_IPv6  = bool(self.bmp_ppc_Peer_Flags & 0x80)
+            self.bmp_ppc_Peer_Flags_Local = bool(self.bmp_ppc_Peer_Flags & 0x40)
+            self.bmp_ppc_Peer_Flags_AS4   = bool(self.bmp_ppc_Peer_Flags & 0x20)
             self.bmp_ppc_Peer_Distinguisher  = struct.unpack_from('!Q', msg, offset=8)[0]     # 8 bytes index 8
-            # 16 byte field to accomodate IPv6, however I assume IPv4 here!
-            self.bmp_ppc_IP6_Peer_Address = struct.unpack_from('!QQ', msg, offset=16)[0]           # 16 bytes index 16
-            self.bmp_ppc_IP4_Peer_Address = struct.unpack_from('!I', msg, offset=28)[0]           # 16 bytes index 16
+            if self.bmp_ppc_Peer_Flags_IPv6:
+                self.bmp_ppc_Peer_Address = IPv6Address(struct.unpack_from('!QQ', msg, offset=16)[0])
+            else:
+                self.bmp_ppc_Peer_Address = IPv4Address(struct.unpack_from('!I', msg, offset=28)[0])
             self.bmp_ppc_Peer_AS = struct.unpack_from('!I', msg, offset=32)[0]                # 4 bytes index 32
             self.bmp_ppc_Peer_BGPID = struct.unpack_from('!I', msg, offset=36)[0]             # 4 bytes index 36
             self.bmp_ppc_Timestamp_Seconds = struct.unpack_from('!I', msg, offset=40)[0]      # 4 bytes index 40

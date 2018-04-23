@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
 import sys
+import ipaddress
 import yaml
 from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable
 from oBMPparse import oBMP_parse
 
 from bmpcontext import BMP_process
+
 
 if len(sys.argv) > 1:
     config_file = sys.argv[1]
@@ -19,10 +21,16 @@ _bootstrap_servers = config['bootstrap_servers']
 _client_id = config['client_id']
 _group_id = config['group_id']
 _topic = config['topic']
+if 'remote peer address' in config:
+    _remote_peer_address = ipaddress.ip_address(config['remote peer address'])
+else:
+    _remote_peer_address = None
+
 if 'name' in config:
     _name = config['name']
 else:
     _name = _topic
+
 while True:
     try:
         consumer=KafkaConsumer( _topic, api_version_auto_timeout_ms = 1000, request_timeout_ms = 1000, bootstrap_servers=_bootstrap_servers, client_id=_client_id)
@@ -30,7 +38,7 @@ while True:
     except NoBrokersAvailable:
         print("retrying connection to Kafka broker")
 
-bmp_process = BMP_process(_name)
+bmp_process = BMP_process(_name,_remote_peer_address)
 
 try:
     for message in consumer:

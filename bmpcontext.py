@@ -15,7 +15,7 @@ class BMP_peer:
     def __init__(self, peer):
         self.source = peer['source']
         self.peer_data = peer
-        self.peer_string = "AS%d:%s" % (peer['remote_AS'], peer['remote_IPv4_address'])
+        self.peer_string = "AS%d:%s" % (peer['remote_AS'], peer['remote_address'])
         print("new peer connected %s" % self.peer_string)
         self.state = "undefined"
         self.stats_count = 0
@@ -41,17 +41,20 @@ class BMP_peer:
         elif msg_type == BMP_Statistics_Report:
             self.stats_count  += 1
             print("stats report %d for %s" % (self.stats_count, self.peer_string))
+            print(self.bgp_context.adjrib)
         elif msg_type == BMP_Route_Monitoring:
             self.RM_count  += 1
             self.bgp_context.consume(msg)
 
 class BMP_process:
     
-    def __init__(self,source):
+    def __init__(self,source,remote_peer_address=None):
         self.parser = bmpapp.BmpContext(source)
         self.peers = {}
         self.source = source
         self.count = 0
+        self.remote_peer_address = remote_peer_address
+        self.ignored_peers = {}
 
     def process_message(self,bmp_msg):
         self.count += 1
@@ -61,11 +64,20 @@ class BMP_process:
             print("BMP session start")
         elif msg_type == BMP_Termination_Message:
             print("BMP session end")
+        elif peer['hash'] in self.ignored_peers:
+            pass
         else:
             if not peer['hash'] in self.peers:
-                peer['source'] = self.source
-                self.peers[peer['hash']] = BMP_peer(peer)
-            self.peers[peer['hash']].consume(msg_type,msg,bmp_msg)
+                if not self.remote_peer_address or peer['remote_address'] == self.remote_peer_address:
+                    peer['source'] = self.source
+                    self.peers[peer['hash']] = BMP_peer(peer)
+                else:
+                    print("** ignoring peer at %s" % peer['remote_address'])
+                    print("** will only accept peer at %s" % self.remote_peer_address)
+                    self.ignored_peers[peer['hash']] = peer
+
+            if peer['hash'] in self.peers:
+                self.peers[peer['hash']].consume(msg_type,msg,bmp_msg)
 
     def get_next(self,msg):
         tail,bmp_msg = BMP_message.get_next(msg)

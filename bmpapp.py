@@ -28,7 +28,7 @@ class BmpContext():
         assert peer_hash in self.peers
         assert msg.msg_type == bmpparse.BMP_Peer_Up_Notification
         peer_up = {}
-        peer_up['local_address'] = IPv4Address(msg.bmp_peer_up_local_address)
+        peer_up['local_address'] = ip_address(msg.bmp_peer_up_local_address)
         peer_up['local_port'] = msg.bmp_peer_up_local_port
         peer_up['remote_port'] =  msg.bmp_peer_up_remote_port
         peer_up['sent_open'] = msg.bmp_peer_up_sent_open
@@ -50,10 +50,11 @@ class BmpContext():
         ph = {}
         ph['name']     = self.name
         ph['hash']     = peer_hash
-        ph['remote_IPv4_address'] = IPv4Address(msg.bmp_ppc_IP4_Peer_Address)
+        ph['remote_address']      = msg.bmp_ppc_Peer_Address
         ph['remote_AS']           = msg.bmp_ppc_Peer_AS
         ph['Peer_Type']           = msg.bmp_ppc_Peer_Type
-        ph['Peer_Flags']          = msg.bmp_ppc_Peer_Flags
+        ph['AS4_flag']          = msg.bmp_ppc_Peer_Flags_AS4
+        ph['IPv6_flag']          = msg.bmp_ppc_Peer_Flags_IPv6
         ph['Peer_Distinguisher']  = msg.bmp_ppc_Peer_Distinguisher 
         ph['Peer_BGPID']          = IPv4Address(msg.bmp_ppc_Peer_BGPID)
 
@@ -86,7 +87,7 @@ class BmpContext():
                     self.new_peer(msg)
                     self.log("new peer recognised")
                 def _log (s):
-                    self.log("%s -- peer: AS%d:%s" % ( s, self.peers[peer_hash]['remote_AS'], self.peers[peer_hash]['remote_IPv4_address']))
+                    self.log("%s -- peer: AS%d:%s" % ( s, self.peers[peer_hash]['remote_AS'], self.peers[peer_hash]['remote_address']))
 
                 if msg.msg_type == bmpparse.BMP_Peer_Down_Notification:
                     self.msg_stats['BMP_peer_down'] += 1
