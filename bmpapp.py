@@ -1,16 +1,10 @@
 #
 #
 
-import struct
 import sys
 import bmpparse
-import bgpmsg
-#import BGPribdb
-import pprint
-import capabilitycodes
 import time
 from ipaddress import IPv4Address
-
 
 logfile=sys.stdout
 
@@ -56,14 +50,13 @@ class BmpContext():
         assert peer_hash not in self.peers
         ph = {}
         ph['name']     = self.name
+        ph['hash']     = peer_hash
         ph['remote_IPv4_address'] = IPv4Address(msg.bmp_ppc_IP4_Peer_Address)
         ph['remote_AS']           = msg.bmp_ppc_Peer_AS
         ph['Peer_Type']           = msg.bmp_ppc_Peer_Type
         ph['Peer_Flags']          = msg.bmp_ppc_Peer_Flags
         ph['Peer_Distinguisher']  = msg.bmp_ppc_Peer_Distinguisher 
         ph['Peer_BGPID']          = IPv4Address(msg.bmp_ppc_Peer_BGPID)
-
-        ###ph['rib'] = BGPribdb.BGPribdb(ph['name'], ph['remote_IPv4_address'], ph['remote_AS'], ph['Peer_BGPID'])
 
         self.peers[peer_hash] = ph
 
@@ -73,18 +66,22 @@ class BmpContext():
         else:
             self.log("creating peer record from other (non-Peer Up) BMP message")
 
+    def get_peer(self, hash):
+        return self.peers[hash]
+
     def parse(self,msg):
         try:
+            peer_hash = None
+            msg_type = msg.msg_type
+            rmsg = None
             self.dump_file.write(msg.msg)
             self.dump_file.flush()
             if msg.msg_type == bmpparse.BMP_Initiation_Message:
                 self.msg_stats['BMP_init'] += 1
                 self.log("BMP Initiation Message rcvd")
-                return (msg.msg_type, None)
             elif msg.msg_type == bmpparse.BMP_Termination_Message:
                 self.msg_stats['BMP_termination'] += 1
                 self.log("BMP Termination Message rcvd")
-                return (msg.msg_type, None)
             else:
                 peer_hash = msg.bmp_ppc_fixed_hash
                 new_peer_flag = (peer_hash not in self.peers)
@@ -100,7 +97,6 @@ class BmpContext():
     
                     if new_peer_flag:
                         _log("BMP Peer Down rcvd for new peer")
-                    return (msg.msg_type, None)
 
                 elif msg.msg_type == bmpparse.BMP_Peer_Up_Notification:
                     self.msg_stats['BMP_peer_up'] += 1
@@ -114,26 +110,19 @@ class BmpContext():
                     elif peer_up_received:
                         _log("BMP Peer Up (repeat)")
                         _log("BMP Peer Up rcvd for peer configured on other data")
-                    return (msg.msg_type, None)
 
                 elif msg.msg_type == bmpparse.BMP_Statistics_Report:
                     self.msg_stats['BMP_statistics'] += 1
                     _log("BMP stats report rcvd")
-                    return (msg.msg_type, None)
                 elif msg.msg_type == bmpparse.BMP_Route_Monitoring:
                     self.msg_stats['BMP_route_monitoring'] += 1
                     if new_peer_flag:
                         _log("route monitoring rcvd for new peer")
-                    return (msg.msg_type, msg.bmp_RM_bgp_message)
-                    #parsed_bgp_message = bgpmsg.BGP_message(msg.bmp_RM_bgp_message)
-                    #update = parsed_bgp_message.parse()
-                    #if update.end_of_rib:
-                            #self.log("End-of-RIB received")
-                    #if update.except_flag:
-                        #self.log("except during parsing message")
+                        rmsg = msg.bmp_RM_bgp_message
                 else:
                     self.msg_stats['BMP_other'] += 1
                     self.log("BMP non RM rcvd, BMP msg type was %d, length %d\n" % (msg.msg_type,msg.length))
+                    return (None, None, None)
         except KeyError as ke:
             kes = str(ke).strip("'")
             if kes.startswith('BMP_'):
@@ -141,3 +130,4 @@ class BmpContext():
                 #print("handled [%s]" % kes)
             else:
                 raise ke
+        return (msg_type, self.get_peer(peer_hash), rmsg)
