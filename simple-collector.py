@@ -24,13 +24,14 @@ _topic = config['topic']
 
 parser = bmpapp.BmpContext("simple")
 
-while True:
-    try:
-        consumer=KafkaConsumer( _topic, api_version_auto_timeout_ms = 1000, request_timeout_ms = 1000, bootstrap_servers=_bootstrap_servers, client_id=_client_id)
-        print("Kafka connection established")
-        break
-    except NoBrokersAvailable:
-        print("Kafka connection error, retrying")
+##while True:
+    ##try:
+        ##consumer=KafkaConsumer( _topic, api_version_auto_timeout_ms = 1000, request_timeout_ms = 1000, bootstrap_servers=_bootstrap_servers, client_id=_client_id)
+        ##print("Kafka connection established")
+        ##break
+    ##except NoBrokersAvailable:
+        ##print("Kafka connection error, retrying")
+consumer=KafkaConsumer( _topic, api_version_auto_timeout_ms = 1000, request_timeout_ms = 1000, bootstrap_servers=_bootstrap_servers, client_id=_client_id)
 try:
     for message in consumer:
         raw_bmp_message = oBMP_parse(bytearray(message.value))

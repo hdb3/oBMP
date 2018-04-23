@@ -146,18 +146,8 @@ class BmpContext():
                         print("-- ID:%s - route monitoring rcvd for new peer" % self.name)
                     parsed_bgp_message = bgpmsg.BGP_message(msg.bmp_RM_bgp_message)
                     update = parsed_bgp_message.parse()
-                    if 0 == len(update.withdrawn_prefixes) and 0 == len(update.prefixes):
-                        if 0 == len(update.path_attributes):
+                    if update.end_of_rib:
                             print("-- ID:%s - End-of-RIB received" % self.name)
-                            print(self.peers[peer_hash]['rib'])
-                        else:
-                            pass
-                            #~# print("-- ID:%s - empty update received" % self.name)
-                            #~# if bgpparse.BGP_TYPE_CODE_AS_PATH in parsed_bgp_message.attribute:
-                                #~# print("AS path: ", parsed_bgp_message.attribute[bgpparse.BGP_TYPE_CODE_AS_PATH])
-                            #~# else:
-                                #~# print(parsed_bgp_message.attribute)
-                        ## print(parsed_bgp_message.attribute)
                     if update.except_flag:
                         eprint("except during parsing at message no %d" % n)
                     else:
@@ -167,10 +157,9 @@ class BmpContext():
                     self.msg_stats['BMP_other'] += 1
                     eprint("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg.msg_type,msg.length))
         except KeyError as ke:
-            #print(ke)
             kes = str(ke).strip("'")
             if kes.startswith('BMP_'):
                 self.msg_stats[kes] = 1
-                print("handled [%s]" % kes)
+                #print("handled [%s]" % kes)
             else:
                 raise ke
