@@ -20,7 +20,6 @@ class BmpContext():
         self.name = str(peer)
         self.peer = peer
         ts = str(time.time())
-        self.dump_file = open("dump/" + self.name + "-bmp-context-except-" + ts + ".bmp","wb")
         self.peers = {}
         self.msg_stats = {}
 
@@ -74,8 +73,6 @@ class BmpContext():
             peer_hash = None
             msg_type = msg.msg_type
             rmsg = None
-            self.dump_file.write(msg.msg)
-            self.dump_file.flush()
             if msg.msg_type == bmpparse.BMP_Initiation_Message:
                 self.msg_stats['BMP_init'] += 1
                 self.log("BMP Initiation Message rcvd")
