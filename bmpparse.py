@@ -56,7 +56,10 @@ class BMP_message:
     def __init__(self,msg):
 
         def parse_route_monitoring(msg):
-            self.bmp_RM_bgp_message = BGP_message(msg)
+            self.bmp_RM_bgp_message = msg
+            msg_type,update,tail = bgppeel.peel(msg)
+            assert msg_type == 2 # BGP UPDATE type code
+            assert len(tail) == 0
 
         def parse_statistics(msg):
             stats_count = struct.unpack_from('!I', msg, offset=0)[0]
