@@ -25,6 +25,7 @@ class BGP_message:
         return str(pformat(vars(self)))
 
     def __init__(self,msg):
+        assert isinstance(msg,bytearray)
         self.except_flag = False
         msg_len  = len(msg)
         assert msg_len > 18, "BGP message too short %d" % msg_len

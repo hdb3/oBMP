@@ -114,11 +114,13 @@ class BmpContext():
                 elif msg.msg_type == bmpparse.BMP_Statistics_Report:
                     self.msg_stats['BMP_statistics'] += 1
                     _log("BMP stats report rcvd")
+
                 elif msg.msg_type == bmpparse.BMP_Route_Monitoring:
+                    rmsg = msg.bmp_RM_bgp_message
                     self.msg_stats['BMP_route_monitoring'] += 1
                     if new_peer_flag:
                         _log("route monitoring rcvd for new peer")
-                        rmsg = msg.bmp_RM_bgp_message
+
                 else:
                     self.msg_stats['BMP_other'] += 1
                     self.log("BMP non RM rcvd, BMP msg type was %d, length %d\n" % (msg.msg_type,msg.length))

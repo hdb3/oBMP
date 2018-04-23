@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import bgppeel
+from bgpmsg import BGP_message
 def eprint(s):
     sys.stderr.write(s+'\n')
     sys.stderr.flush()
@@ -55,7 +56,7 @@ class BMP_message:
     def __init__(self,msg):
 
         def parse_route_monitoring(msg):
-            self.bmp_RM_bgp_message = msg
+            self.bmp_RM_bgp_message = BGP_message(msg)
 
         def parse_statistics(msg):
             stats_count = struct.unpack_from('!I', msg, offset=0)[0]
