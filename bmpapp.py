@@ -4,12 +4,12 @@
 import struct
 import sys
 import bmpparse
-import bgpparse
+import bgpmsg
 import BGPribdb
 import pprint
 import capabilitycodes
 import time
-from ipaddress import ip_address
+from ipaddress import IPv4Address
 
 
 logfile=sys.stdout
@@ -21,8 +21,9 @@ def eprint(s):
 class BmpContext():
 
 
-    def __init__(self,name):
-        self.name = name
+    def __init__(self,peer):
+        self.name = str(peer)
+        self.peer = peer
         ts = str(time.time())
         self.dump_file = open("dump/" + self.name + "-bmp-context-except-" + ts + ".bmp","wb")
         self.peers = {}
@@ -32,7 +33,7 @@ class BmpContext():
         assert peer_hash in self.peers
         assert msg.msg_type == bmpparse.BMP_Peer_Up_Notification
         peer_up = {}
-        peer_up['local_address'] = ip_address(msg.bmp_peer_up_local_address)
+        peer_up['local_address'] = IPv4Address(msg.bmp_peer_up_local_address)
         peer_up['local_port'] = msg.bmp_peer_up_local_port
         peer_up['remote_port'] =  msg.bmp_peer_up_remote_port
         peer_up['sent_open'] = msg.bmp_peer_up_sent_open
@@ -58,12 +59,12 @@ class BmpContext():
         assert peer_hash not in self.peers
         ph = {}
         ph['name']     = self.name
-        ph['remote_IPv4_address'] = ip_address(msg.bmp_ppc_IP4_Peer_Address)
+        ph['remote_IPv4_address'] = IPv4Address(msg.bmp_ppc_IP4_Peer_Address)
         ph['remote_AS']           = msg.bmp_ppc_Peer_AS
         ph['Peer_Type']           = msg.bmp_ppc_Peer_Type
         ph['Peer_Flags']          = msg.bmp_ppc_Peer_Flags
         ph['Peer_Distinguisher']  = msg.bmp_ppc_Peer_Distinguisher 
-        ph['Peer_BGPID']          = ip_address(msg.bmp_ppc_Peer_BGPID)
+        ph['Peer_BGPID']          = IPv4Address(msg.bmp_ppc_Peer_BGPID)
 
         ph['rib'] = BGPribdb.BGPribdb(ph['name'], ph['remote_IPv4_address'], ph['remote_AS'], ph['Peer_BGPID'])
 
@@ -88,14 +89,14 @@ class BmpContext():
             if new_peer_flag:
                 self.new_peer(msg)
                 print("-- ID:%s - new peer recognised" % self.name)
-                print("-- ID:%s - new BMP peer: remote address %s" % (self.name,ip_address(msg.bmp_ppc_IP4_Peer_Address)))
+                print("-- ID:%s - new BMP peer: remote address %s" % (self.name,IPv4Address(msg.bmp_ppc_IP4_Peer_Address)))
                 print("-- ID:%s - new BMP peer: remote AS %d" % (self.name,msg.bmp_ppc_Peer_AS))
-                print("-- ID:%s - new BMP peer: peer BGPID %s" % (self.name,ip_address(msg.bmp_ppc_Peer_BGPID)))
+                print("-- ID:%s - new BMP peer: peer BGPID %s" % (self.name,IPv4Address(msg.bmp_ppc_Peer_BGPID)))
 
             if msg.msg_type == bmpparse.BMP_Peer_Up_Notification:
                 peer_up_received = ('Peer_Up_data' in self.peers[peer_hash])
 
-                print("-- ID:%s - BMP Peer Up rcvd - AS%d at %s:%d" % (self.name,msg.bmp_ppc_Peer_AS,ip_address(msg.bmp_ppc_IP4_Peer_Address), msg.bmp_peer_up_remote_port))
+                print("-- ID:%s - BMP Peer Up rcvd - AS%d at %s:%d" % (self.name,msg.bmp_ppc_Peer_AS,IPv4Address(msg.bmp_ppc_IP4_Peer_Address), msg.bmp_peer_up_remote_port))
 
                 if new_peer_flag:
                     print("-- ID:%s - BMP Peer Up rcvd for new peer" % self.name)
@@ -136,9 +137,10 @@ class BmpContext():
                 #print("-- BMP Route Monitoring rcvd, length %d" % msg.length)
                 if new_peer_flag:
                     print("-- ID:%s - route monitoring rcvd for new peer" % self.name)
-                parsed_bgp_message = bgpparse.BGP_message(msg.bmp_RM_bgp_message)
-                if 0 == len(parsed_bgp_message.withdrawn_prefixes) and 0 == len(parsed_bgp_message.prefixes):
-                    if 0 == len(parsed_bgp_message.attribute):
+                parsed_bgp_message = bgpmsg.BGP_message(msg.bmp_RM_bgp_message)
+                update = parsed_bgp_message.parse()
+                if 0 == len(update.withdrawn_prefixes) and 0 == len(update.prefixes):
+                    if 0 == len(update.path_attributes):
                         print("-- ID:%s - End-of-RIB received" % self.name)
                         print(self.peers[peer_hash]['rib'])
                     else:
@@ -149,10 +151,10 @@ class BmpContext():
                         #~# else:
                             #~# print(parsed_bgp_message.attribute)
                     ## print(parsed_bgp_message.attribute)
-                if parsed_bgp_message.except_flag:
+                if update.except_flag:
                     eprint("except during parsing at message no %d" % n)
                 else:
-                    self.peers[peer_hash]['rib'].update(parsed_bgp_message.attribute,parsed_bgp_message.prefixes)
-                    self.peers[peer_hash]['rib'].withdraw(parsed_bgp_message.withdrawn_prefixes)
+                    self.peers[peer_hash]['rib'].update(update.path_attributes,update.prefixes)
+                    self.peers[peer_hash]['rib'].withdraw(update.withdrawn_prefixes)
             else:
                 eprint("-- BMP non RM rcvd, BmP msg type was %d, length %d\n" % (msg.msg_type,msg.length))

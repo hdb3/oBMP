@@ -4,7 +4,7 @@
 
 collector:
     bootstrap_servers: bmp.bgpstream.caida.org:9092
-    client_id: lancaster_university_UK2
+    client_id: lancaster_university
     group_id: beta-bmp-stream
     topic: openbmp.router--route-views.routeviews.org.peer-as--3356.bmp_raw
     remote peer address: 4.69.184.193
