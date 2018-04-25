@@ -2,7 +2,7 @@
 #
 
 import sys
-import bmpparse
+import bgplib.bmpparse as bmpparse
 import time
 from ipaddress import IPv4Address
 

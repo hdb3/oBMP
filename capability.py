@@ -1,6 +1,6 @@
 
 import struct
-from capabilitycodes import BGP_capability_codes,valid_codes
+from bgplib.capabilitycodes import BGP_capability_codes,valid_codes
 cc = BGP_capability_codes
 
 class Capability:    

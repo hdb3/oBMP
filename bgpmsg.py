@@ -8,9 +8,9 @@ import sys
 #from ipaddress import IPv4Address
 #from pprint import pformat
 import traceback
-from bgpupdate import BGP_UPDATE_message
-from bgpopen import BGP_OPEN_message
-from bgpnotification import BGP_NOTIFICATION_message
+from bgplib.bgpupdate import BGP_UPDATE_message
+from bgplib.bgpopen import BGP_OPEN_message
+from bgplib.bgpnotification import BGP_NOTIFICATION_message
 
 BGP_marker = pack('!QQ',0xffffffffffffffff,0xffffffffffffffff)
 BGP_OPEN = 1

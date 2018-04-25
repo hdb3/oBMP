@@ -5,7 +5,7 @@
 
 import struct
 from ipaddress import IPv4Address
-from capability import Capability
+from bgplib.capability import Capability
 
 # see https://www.iana.org/assignments/capability-codes/capability-codes.xml
 # for capability list coding
