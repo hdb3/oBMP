@@ -5,12 +5,15 @@ import sys
 import bgplib.bmpparse as bmpparse
 import time
 from ipaddress import IPv4Address
+from logger import *
 
-logfile=sys.stdout
 
 class BmpContext():
 
     def log(self,s):
+        info(s)
+
+    def __log(self,s):
         logfile.write('-- BMPAPP - ID:' + self.name + ' - ' + s + '\n')
         #logfile.flush()
         return
@@ -41,7 +44,7 @@ class BmpContext():
         self.peers[peer_hash]['Peer_Up_data'] = peer_up
 
     def update_peer(self,msg):
-        self.log("updating peer record from Peer Up Notification message")
+        show("updating peer record from Peer Up Notification message")
         self._update_peer(msg)
 
     def new_peer(self,msg):
@@ -61,10 +64,10 @@ class BmpContext():
         self.peers[peer_hash] = ph
 
         if msg.msg_type == bmpparse.BMP_Peer_Up_Notification:
-            self.log("creating peer record from Peer Up Notification message")
+            show("creating peer record from Peer Up Notification message")
             self._update_peer(msg)
         else:
-            self.log("creating peer record from other (non-Peer Up) BMP message")
+            show("creating peer record from other (non-Peer Up) BMP message")
 
     def get_peer(self, hash):
         return self.peers[hash]
@@ -76,18 +79,22 @@ class BmpContext():
             rmsg = None
             if msg.msg_type == bmpparse.BMP_Initiation_Message:
                 self.msg_stats['BMP_init'] += 1
-                self.log("BMP Initiation Message rcvd")
+                show("BMP Initiation Message rcvd")
             elif msg.msg_type == bmpparse.BMP_Termination_Message:
                 self.msg_stats['BMP_termination'] += 1
-                self.log("BMP Termination Message rcvd")
+                show("BMP Termination Message rcvd")
             else:
                 peer_hash = msg.bmp_ppc_fixed_hash
                 new_peer_flag = (peer_hash not in self.peers)
                 if new_peer_flag:
                     self.new_peer(msg)
-                    self.log("new peer recognised")
+                    show("new peer recognised")
+
                 def _log (s):
-                    self.log("%s -- peer: AS%d:%s" % ( s, self.peers[peer_hash]['remote_AS'], self.peers[peer_hash]['remote_address']))
+                    show("%s -- peer: AS%d:%s" % ( s, self.peers[peer_hash]['remote_AS'], self.peers[peer_hash]['remote_address']))
+
+                def _info (s):
+                    info("%s -- peer: AS%d:%s" % ( s, self.peers[peer_hash]['remote_AS'], self.peers[peer_hash]['remote_address']))
 
                 if msg.msg_type == bmpparse.BMP_Peer_Down_Notification:
                     self.msg_stats['BMP_peer_down'] += 1
@@ -111,7 +118,7 @@ class BmpContext():
 
                 elif msg.msg_type == bmpparse.BMP_Statistics_Report:
                     self.msg_stats['BMP_statistics'] += 1
-                    _log("BMP stats report rcvd")
+                    _info("BMP stats report rcvd")
 
                 elif msg.msg_type == bmpparse.BMP_Route_Monitoring:
                     rmsg = msg.bmp_RM_bgp_message
