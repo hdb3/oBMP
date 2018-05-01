@@ -25,13 +25,15 @@ class BmpContext():
         ts = str(time.time())
         self.peers = {}
         self.msg_stats = {}
+        self.count = 0
 
     def _update_peer(self,msg):
+        trace("")
         peer_hash = msg.bmp_ppc_fixed_hash
         assert peer_hash in self.peers
         assert msg.msg_type == bmpparse.BMP_Peer_Up_Notification
         peer_up = {}
-        peer_up['local_address'] = ip_address(msg.bmp_peer_up_local_address)
+        peer_up['local_address'] = IPv4Address(msg.bmp_peer_up_local_address)
         peer_up['local_port'] = msg.bmp_peer_up_local_port
         peer_up['remote_port'] =  msg.bmp_peer_up_remote_port
         peer_up['sent_open'] = msg.bmp_peer_up_sent_open
@@ -44,10 +46,12 @@ class BmpContext():
         self.peers[peer_hash]['Peer_Up_data'] = peer_up
 
     def update_peer(self,msg):
+        trace("")
         show("updating peer record from Peer Up Notification message")
         self._update_peer(msg)
 
     def new_peer(self,msg):
+        trace("")
         peer_hash = msg.bmp_ppc_fixed_hash
         assert peer_hash not in self.peers
         ph = {}
@@ -70,9 +74,10 @@ class BmpContext():
             show("creating peer record from other (non-Peer Up) BMP message")
 
     def get_peer(self, hash):
-        return self.peers[hash]
+        return self.peers.get(hash)
 
     def parse(self,msg):
+        self.count += 1
         try:
             peer_hash = None
             msg_type = msg.msg_type
@@ -134,7 +139,7 @@ class BmpContext():
             kes = str(ke).strip("'")
             if kes.startswith('BMP_'):
                 self.msg_stats[kes] = 1
-                #print("handled [%s]" % kes)
+                #trace("handled [%s]" % kes)
             else:
                 raise ke
         return (msg_type, self.get_peer(peer_hash), rmsg)

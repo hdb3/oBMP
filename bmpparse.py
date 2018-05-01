@@ -8,7 +8,7 @@ import sys
 import os
 import time
 from ipaddress import IPv4Address,IPv6Address
-import bgplib.bgppeel
+import bgplib.bgppeel as bgppeel
 from bgplib.bgpmsg import BGP_message
 
 def eprint(s):
@@ -59,7 +59,7 @@ class BMP_message:
 
         def parse_route_monitoring(msg):
             self.bmp_RM_bgp_message = msg
-            msg_type,update,tail = bgplib.bgppeel.peel(msg)
+            msg_type,update,tail = bgppeel.peel(msg)
             assert msg_type == 2 # BGP UPDATE type code
             assert len(tail) == 0
 
