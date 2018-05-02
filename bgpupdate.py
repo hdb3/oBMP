@@ -13,12 +13,6 @@ import struct
 from ipaddress import IPv4Network,AddressValueError
 from logger import *
 
-logfile=sys.stderr
-def eprint(s):
-    logfile.write(s+'\n')
-    logfile.flush()
-    return
-
 def b(x):
     return bytearray([x])
 
@@ -105,7 +99,7 @@ class BGP_UPDATE_message:
         if self.as4_flag is None:
             self.as4_flag = as4_flag
         else:
-            warn("AS4 check failed")
+            trace("AS4 check failed")
             stack_trace()
             #assert self.as4_flag == as4_flag
 
@@ -218,10 +212,10 @@ class BGP_UPDATE_message:
                 self.parse_attribute(attr_flags,attr_type_code,attribute)
             except AssertionError as e:
                 self.except_flag = True
-                eprint("++failed to parse attribute seq %d at offset %d/length %d, flags:code = (%x,%d) payload %s" \
+                warn("++failed to parse attribute seq %d at offset %d/length %d, flags:code = (%x,%d) payload %s" \
                         % (attr_count,offset,length,attr_flags,attr_type_code,attribute.hex()))
-                eprint("++failed to parse attribute  : error: %s" % e)
-                eprint("++failed to parse attributes : %d %s" % (attributes_len,attributes.hex()))
+                warn("++failed to parse attribute  : error: %s" % e)
+                warn("++failed to parse attributes : %d %s" % (attributes_len,attributes.hex()))
                 traceback.print_tb( sys.exc_info()[2])
                 exit()
             offset += length+quantum
@@ -230,13 +224,13 @@ class BGP_UPDATE_message:
         if len(self.prefixes) > 0:
 
             if BGP_TYPE_CODE_ORIGIN not in self.path_attributes:
-                eprint("mandatory attribute BGP_TYPE_CODE_ORIGIN missing")
+                warn("mandatory attribute BGP_TYPE_CODE_ORIGIN missing")
                 self.except_flag = True
             if BGP_TYPE_CODE_AS_PATH not in self.path_attributes:
-                eprint("mandatory attribute BGP_TYPE_CODE_AS_PATH missing")
+                warn("mandatory attribute BGP_TYPE_CODE_AS_PATH missing")
                 self.except_flag = True
             if BGP_TYPE_CODE_NEXT_HOP not in self.path_attributes:
-                eprint("mandatory attribute BGP_TYPE_CODE_NEXT_HOP missing")
+                warn("mandatory attribute BGP_TYPE_CODE_NEXT_HOP missing")
                 self.except_flag = True
         else:
             assert len(self.prefixes) == 0, "check for processing NLRI before attributes failed"
@@ -286,14 +280,14 @@ class BGP_UPDATE_message:
     def parse_attribute_as_pathlimit(self,code,attr):
             assert len(attr) == 5
             self.path_attributes[code] = (struct.unpack_from('!B', attr, offset=0)[0],struct.unpack_from('!I', attr, offset=1)[0])
-            ##eprint("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.path_attributes[code]))
+            ##warn("parse_attribute_as_pathlimit found, value %d from AS %d" % (self.path_attributes[code]))
 
     def parse_attribute_connector(self,code,attr):
         # see https://tools.ietf.org/html/draft-nalawade-l3vpn-bgp-connector-00
 
             assert len(attr) >4
             self.path_attributes[code] = attr
-            ##eprint("parse_attribute_connector: value %s" % attr.hex())
+            ##warn("parse_attribute_connector: value %s" % attr.hex())
 
 
 
@@ -364,7 +358,7 @@ class BGP_UPDATE_message:
                 path_as4 = get_segments(attr,4)
                 path_as2 = get_segments(attr,2)
                 if path_as4[0] and path_as2[0]:
-                    eprint("ambiguous AS path can be read as AS2 or AS4 - choosing AS4")
+                    warn("ambiguous AS path can be read as AS2 or AS4 - choosing AS4")
                     self.as4_flag = True
                     segments = path_as4[1]
                     self.except_flag = True
@@ -375,9 +369,9 @@ class BGP_UPDATE_message:
                     self.as4_flag = False
                     segments = path_as2[1]
                 else:
-                    eprint("invalid AS path can not be read as AS2 or AS4")
-                    eprint("AS4 error parse msg: %s" % path_as4[1])
-                    eprint("AS2 error parse msg: %s" % path_as2[1])
+                    warn("invalid AS path can not be read as AS2 or AS4")
+                    warn("AS4 error parse msg: %s" % path_as4[1])
+                    warn("AS2 error parse msg: %s" % path_as2[1])
                     segments = None
                     self.except_flag = True
             else:
@@ -389,8 +383,8 @@ class BGP_UPDATE_message:
                 if path[0]:
                     segments = path[1]
                 else:
-                    eprint("invalid AS path")
-                    eprint("error parse msg: %s" % path[1])
+                    warn("invalid AS path")
+                    warn("error parse msg: %s" % path[1])
                     segments = None
                     self.except_flag = True
 
