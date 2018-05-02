@@ -11,7 +11,7 @@ import sys
 import traceback
 import struct
 from ipaddress import IPv4Network,AddressValueError
-#from bgpmsg import BGP_message
+from logger import *
 
 logfile=sys.stderr
 def eprint(s):
@@ -66,8 +66,9 @@ attribute_flags = dict([
     (BGP_TYPE_CODE_MP_REACH_NLRI, BGP_Attribute_Flags_Optional), \
     (BGP_TYPE_CODE_MP_UNREACH_NLRI, BGP_Attribute_Flags_Optional), \
     (BGP_TYPE_CODE_EXTENDED_COMMUNITIES, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
-    (BGP_TYPE_CODE_AS4_PATH, BGP_Attribute_Flags_Optional), \
-    (BGP_TYPE_CODE_AS4_AGGREGATOR, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_AS4_PATH, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
+    #(BGP_TYPE_CODE_AS4_PATH, BGP_Attribute_Flags_Optional), \
+    (BGP_TYPE_CODE_AS4_AGGREGATOR, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
     (BGP_TYPE_CODE_CONNECTOR, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
     (BGP_TYPE_CODE_AS_PATHLIMIT, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
     (BGP_TYPE_CODE_LARGE_COMMUNITY, BGP_Attribute_Flags_Transitive | BGP_Attribute_Flags_Optional), \
@@ -104,7 +105,9 @@ class BGP_UPDATE_message:
         if self.as4_flag is None:
             self.as4_flag = as4_flag
         else:
-            assert self.as4_flag == as4_flag
+            warn("AS4 check failed")
+            stack_trace()
+            #assert self.as4_flag == as4_flag
 
 
     def __str__(self):

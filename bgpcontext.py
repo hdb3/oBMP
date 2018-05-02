@@ -3,6 +3,7 @@
 # bgpcontext.py
 
 from ipaddress import IPv4Address
+from logger import *
 from bgplib.BGPribdb import BGPribdb
 from bgplib.bgpmsg import BGP_message,BGP_OPEN,BGP_KEEPALIVE,BGP_UPDATE,BGP_NOTIFICATION
 from bgplib.bgpopen import BGP_OPEN_message
@@ -15,6 +16,9 @@ class BGP_context:
         self.peer_string = "AS%d:%s" % (peer_data['remote_AS'], peer_data['remote_address'])
         show("BGP context: new peer connected %s" % self.peer_string)
         self.adjrib = BGPribdb(self.peer_string, peer_data['remote_address'] , peer_data['remote_AS'], peer_data['remote_address'])
+
+    def __str__(self):
+        return ("context dump\n peer: %s\n" % self.peer_string + str(self.adjrib))
             
     def consume(self, msg):
             bgp_msg = BGP_message(msg)
@@ -44,6 +48,6 @@ class BGP_context:
 
 def new_headless_context():
     peer_data = {}
-    peer_data['remote_AS'] = "99999"
+    peer_data['remote_AS'] = 99999
     peer_data['remote_address'] = IPv4Address("0.0.0.0")
     return BGP_context(peer_data)
